@@ -1,0 +1,138 @@
+import type { Request, Response } from 'express';
+import { z } from 'zod';
+
+import prisma from '../lib/prisma.js';
+import { ApiError } from '../middleware/error.js';
+import { getSettings } from '../services/settings.service.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { paramId, parseBody } from '../utils/validate.js';
+
+const categorySchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional().nullable(),
+  parentId: z.string().nullable().optional(),
+  isActive: z.boolean().default(true),
+});
+
+const brandSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+const locationSchema = z.object({
+  code: z.string().min(1).max(20),
+  name: z.string().min(1).max(100),
+  type: z.string().max(20).default('AREA'),
+  description: z.string().max(500).optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+export const listCategories = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await prisma.category.findMany({
+    orderBy: { name: 'asc' },
+    include: { _count: { select: { products: true } } },
+  });
+  res.json({ data });
+});
+
+export const createCategory = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(categorySchema, req.body);
+  const data = await prisma.category.create({
+    data: {
+      name: input.name,
+      description: input.description,
+      parentId: input.parentId,
+      isActive: input.isActive,
+    },
+  });
+  res.status(201).json({ data });
+});
+
+export const updateCategory = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(categorySchema.partial(), req.body);
+  const data = await prisma.category.update({
+    where: { id: paramId(req, 'id') },
+    data: { ...input, parentId: input.parentId === undefined ? undefined : input.parentId },
+  });
+  res.json({ data });
+});
+
+export const listBrands = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await prisma.brand.findMany({
+    orderBy: { name: 'asc' },
+    include: { _count: { select: { products: true } } },
+  });
+  res.json({ data });
+});
+
+export const createBrand = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(brandSchema, req.body);
+  const existing = await prisma.brand.findUnique({ where: { name: input.name } });
+  if (existing) throw ApiError.conflict('A brand with this name already exists');
+  const data = await prisma.brand.create({ data: input });
+  res.status(201).json({ data });
+});
+
+export const updateBrand = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(brandSchema.partial(), req.body);
+  const data = await prisma.brand.update({
+    where: { id: paramId(req, 'id') },
+    data: input,
+  });
+  res.json({ data });
+});
+
+export const listLocations = asyncHandler(async (req: Request, res: Response) => {
+  const data = await prisma.storageLocation.findMany({
+    where: { branchId: req.user!.branchId },
+    orderBy: { code: 'asc' },
+  });
+  res.json({ data });
+});
+
+export const createLocation = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(locationSchema, req.body);
+  const existing = await prisma.storageLocation.findUnique({
+    where: { branchId_code: { branchId: req.user!.branchId, code: input.code.toUpperCase() } },
+  });
+  if (existing) throw ApiError.conflict('A location with this code already exists');
+  const data = await prisma.storageLocation.create({
+    data: {
+      branchId: req.user!.branchId,
+      code: input.code.toUpperCase(),
+      name: input.name,
+      type: input.type,
+      description: input.description,
+      isActive: input.isActive,
+    },
+  });
+  res.status(201).json({ data });
+});
+
+export const updateLocation = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(locationSchema.partial(), req.body);
+  const existing = await prisma.storageLocation.findFirst({
+    where: { id: paramId(req, 'id'), branchId: req.user!.branchId },
+  });
+  if (!existing) throw ApiError.notFound('Location not found');
+  const data = await prisma.storageLocation.update({
+    where: { id: paramId(req, 'id') },
+    data: input,
+  });
+  res.json({ data });
+});
+
+export const getBusinessSettings = asyncHandler(async (req: Request, res: Response) => {
+  const settings = await getSettings(req.user!.branchId);
+  res.json({
+    data: {
+      businessName: settings.businessName ?? 'BennyBlax Enterprises',
+      currency: settings.currency ?? 'TZS',
+      receiptFooter: settings.receiptFooter ?? '',
+      address: settings.address ?? null,
+      phone: settings.phone ?? null,
+      email: settings.email ?? null,
+    },
+  });
+});
