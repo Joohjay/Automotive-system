@@ -28,7 +28,6 @@ interface Line {
   productId: string
   quantity: string
   unitCost: string
-  discount: string
 }
 
 function todayStr() {
@@ -49,7 +48,7 @@ export function PurchaseFormDialog({
   const [purchaseDate, setPurchaseDate] = useState(todayStr)
   const [discount, setDiscount] = useState('0')
   const [notes, setNotes] = useState('')
-  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: '', quantity: '', unitCost: '', discount: '0' }])
+  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: '', quantity: '', unitCost: '' }])
   const [nextKey, setNextKey] = useState(2)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +68,7 @@ export function PurchaseFormDialog({
     setPurchaseDate(todayStr())
     setDiscount('0')
     setNotes('')
-    setLines([{ key: 1, productId: '', quantity: '', unitCost: '', discount: '0' }])
+    setLines([{ key: 1, productId: '', quantity: '', unitCost: '' }])
     setNextKey(2)
     setShowNewSupplier(false)
     setShowNewProduct(null)
@@ -79,8 +78,7 @@ export function PurchaseFormDialog({
   const subtotal = lines.reduce((acc, l) => {
     const qty = Number(l.quantity) || 0
     const cost = Number(l.unitCost) || 0
-    const lineDisc = Number(l.discount) || 0
-    return acc + qty * cost - lineDisc
+    return acc + qty * cost
   }, 0)
   const grandTotal = Math.max(0, subtotal - (Number(discount) || 0))
 
@@ -89,7 +87,7 @@ export function PurchaseFormDialog({
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { key: nextKey, productId: '', quantity: '', unitCost: '', discount: '0' }])
+    setLines((prev) => [...prev, { key: nextKey, productId: '', quantity: '', unitCost: '' }])
     setNextKey((k) => k + 1)
   }
 
@@ -269,11 +267,11 @@ export function PurchaseFormDialog({
             <div className="space-y-2">
               {lines.map((line) => {
                 const product = productCache.get(line.productId)
-                const lineTotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0) - (Number(line.discount) || 0)
+                const lineTotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0)
                 return (
                   <div key={line.key} className="space-y-1.5 rounded-lg border p-3">
                     <div className="grid grid-cols-12 items-start gap-2">
-                      <div className="col-span-5">
+                      <div className="col-span-6">
                         {showNewProduct === line.key ? (
                           <InlineProductForm
                             initialName={newProductName}
@@ -300,7 +298,7 @@ export function PurchaseFormDialog({
                         onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
                       />
                       <Input
-                        className="col-span-2"
+                        className="col-span-3"
                         type="number"
                         min="0"
                         step="any"
@@ -308,17 +306,6 @@ export function PurchaseFormDialog({
                         value={line.unitCost}
                         onChange={(e) => updateLine(line.key, { unitCost: e.target.value })}
                       />
-                      <div className="col-span-2 flex items-center gap-1">
-                        <Input
-                          className="h-9 w-full"
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="Discount"
-                          value={line.discount}
-                          onChange={(e) => updateLine(line.key, { discount: e.target.value })}
-                        />
-                      </div>
                       <Button
                         type="button"
                         variant="ghost"
