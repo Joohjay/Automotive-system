@@ -15,6 +15,7 @@ build/
 logs/
 *.log
 npm-debug.log*
+server/.test-server.log
 
 # Test coverage
 coverage/

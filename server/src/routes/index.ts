@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { config } from '../config/env.js';
 import healthRouter from './health.js';
 import authRouter from './auth.js';
 import productRouter from './products.js';
@@ -15,7 +16,6 @@ import loanRouter from './loans.js';
 import shiftRouter from './shifts.js';
 import reportRouter from './reports.js';
 import notificationRouter from './notifications.js';
-import devRouter from './dev.js';
 
 const router = Router();
 
@@ -34,6 +34,10 @@ router.use('/loans', loanRouter);
 router.use('/shifts', shiftRouter);
 router.use('/reports', reportRouter);
 router.use('/notifications', notificationRouter);
-router.use('/_dev', devRouter);
+
+if (config.isDevelopment) {
+  const devRouter = (await import('./dev.js')).default;
+  router.use('/_dev', devRouter);
+}
 
 export default router;

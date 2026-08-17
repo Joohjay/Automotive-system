@@ -6,11 +6,18 @@
  * inventory, etc.).
  *
  * Run with: npm run db:seed
+ * Will only execute when NODE_ENV is development or test.
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+if (nodeEnv === 'production') {
+  console.error('[seed] REFUSING to run in production. Set NODE_ENV=development to seed dev data.');
+  process.exit(1);
+}
 
 const DEV_ADMIN_EMAIL = 'admin@autoparts.local';
 const DEV_ADMIN_PASSWORD = 'Admin@12345';

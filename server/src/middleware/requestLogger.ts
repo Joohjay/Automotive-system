@@ -14,7 +14,6 @@ export function requestContext(): (
 ) => void {
   return (req, _res, next) => {
     req.headers['x-request-id'] =
-      (req.headers['x-request-id'] as string) ??
       `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     next();
   };

@@ -17,26 +17,28 @@ export interface NavItem {
   href: string
   icon: LucideIcon
   description?: string
+  permission?: string
 }
 
 /**
  * Central navigation definition for the application shell.
  * Modules are added here as they are implemented in each stage.
+ * The optional `permission` field controls visibility per user role.
  */
 export const primaryNav: NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: Gauge },
-  { label: 'Point of Sale', href: '/pos', icon: ShoppingCart, description: 'Sales, receipts, payments' },
-  { label: 'Products', href: '/products', icon: Package, description: 'Parts, categories, brands' },
-  { label: 'Inventory', href: '/inventory', icon: Boxes, description: 'Stock, adjustments, ledger' },
-  { label: 'Stock Receiving', href: '/receiving', icon: Truck, description: 'Purchase orders and stock-in' },
-  { label: 'Suppliers', href: '/suppliers', icon: ClipboardList, description: 'Vendor records' },
-  { label: 'Sales', href: '/sales', icon: Receipt, description: 'Sales history and voids' },
-  { label: 'Returns', href: '/returns', icon: Undo2, description: 'Refunds and restocking' },
-  { label: 'Customers', href: '/customers', icon: Users, description: 'Credit accounts and payments' },
-  { label: 'Expenses', href: '/expenses', icon: DollarSign, description: 'Operational costs' },
-  { label: 'Loans', href: '/loans', icon: ClipboardList, description: 'Funding sources and lending' },
-  { label: 'Reports', href: '/reports', icon: Gauge, description: 'Sales and stock analytics' },
-  { label: 'Shifts', href: '/shifts', icon: ClipboardList, description: 'Cashier shift management' },
+  { label: 'Dashboard', href: '/', icon: Gauge, permission: 'dashboard.view' },
+  { label: 'Point of Sale', href: '/pos', icon: ShoppingCart, description: 'Sales, receipts, payments', permission: 'sale.create' },
+  { label: 'Products', href: '/products', icon: Package, description: 'Parts, categories, brands', permission: 'product.view' },
+  { label: 'Inventory', href: '/inventory', icon: Boxes, description: 'Stock, adjustments, ledger', permission: 'inventory.view' },
+  { label: 'Stock Receiving', href: '/receiving', icon: Truck, description: 'Purchase orders and stock-in', permission: 'purchase.view' },
+  { label: 'Suppliers', href: '/suppliers', icon: ClipboardList, description: 'Vendor records', permission: 'supplier.view' },
+  { label: 'Sales', href: '/sales', icon: Receipt, description: 'Sales history and voids', permission: 'sale.view' },
+  { label: 'Returns', href: '/returns', icon: Undo2, description: 'Refunds and restocking', permission: 'sale.return' },
+  { label: 'Customers', href: '/customers', icon: Users, description: 'Credit accounts and payments', permission: 'customer.view' },
+  { label: 'Expenses', href: '/expenses', icon: DollarSign, description: 'Operational costs', permission: 'expense.view' },
+  { label: 'Loans', href: '/loans', icon: ClipboardList, description: 'Funding sources and lending', permission: 'loan.view' },
+  { label: 'Reports', href: '/reports', icon: Gauge, description: 'Sales and stock analytics', permission: 'report.view' },
+  { label: 'Shifts', href: '/shifts', icon: ClipboardList, description: 'Cashier shift management', permission: 'shift.open' },
 ]
 
 export const upcomingModules: NavItem[] = []

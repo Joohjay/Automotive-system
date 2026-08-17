@@ -3,11 +3,18 @@
  * Used by the integration test suite and for manual RBAC checks.
  *
  * Usage: npm run db:cashier
+ * Will only execute when NODE_ENV is development or test.
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+if (nodeEnv === 'production') {
+  console.error('[cashier] REFUSING to run in production.');
+  process.exit(1);
+}
 
 async function main() {
   const role = await prisma.role.findUnique({ where: { name: 'CASHIER' } });

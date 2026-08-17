@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 
 import { AppShell } from '@/components/layout/AppShell'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RequirePermission } from '@/components/auth/ProtectedRoute'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LoginPage } from '@/pages/LoginPage'
@@ -30,18 +31,42 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route index element={<DashboardPage />} />
-              <Route path="pos" element={<PosPage />} />
-              <Route path="products" element={<ProductsPage />} />
-              <Route path="inventory" element={<InventoryPage />} />
-              <Route path="receiving" element={<ReceivingPage />} />
-              <Route path="suppliers" element={<SuppliersPage />} />
-              <Route path="sales" element={<SalesPage />} />
-              <Route path="returns" element={<ReturnsPage />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="expenses" element={<ExpensesPage />} />
-              <Route path="loans" element={<LoansPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="shifts" element={<ShiftsPage />} />
+              <Route element={<RequirePermission permission="sale.create" />}>
+                <Route path="pos" element={<PosPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="product.view" />}>
+                <Route path="products" element={<ProductsPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="inventory.view" />}>
+                <Route path="inventory" element={<InventoryPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="purchase.view" />}>
+                <Route path="receiving" element={<ReceivingPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="supplier.view" />}>
+                <Route path="suppliers" element={<SuppliersPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="sale.view" />}>
+                <Route path="sales" element={<SalesPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="sale.return" />}>
+                <Route path="returns" element={<ReturnsPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="customer.view" />}>
+                <Route path="customers" element={<CustomersPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="expense.view" />}>
+                <Route path="expenses" element={<ExpensesPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="loan.view" />}>
+                <Route path="loans" element={<LoansPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="report.view" />}>
+                <Route path="reports" element={<ReportsPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="shift.open" />}>
+                <Route path="shifts" element={<ShiftsPage />} />
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Route>

@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { Wrench } from 'lucide-react'
 
 import { primaryNav, upcomingModules } from '@/config/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 
 function NavSection({
@@ -9,9 +10,12 @@ function NavSection({
 }: {
   items: typeof primaryNav
 }) {
+  const { hasPermission } = useAuth()
+  const visible = items.filter((item) => !item.permission || hasPermission(item.permission))
+
   return (
     <nav className="flex flex-col gap-1 px-2">
-      {items.map((item) => (
+      {visible.map((item) => (
         <NavLink
           key={item.href}
           to={item.href}
