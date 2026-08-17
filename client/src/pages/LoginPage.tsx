@@ -38,7 +38,7 @@ export function LoginPage() {
     }
   }
 
-  const businessName = settings?.businessName ?? 'BennyBlax Enterprises'
+  const businessName = settings?.businessName ?? 'Blax Enterprises'
 
   return (
     <div className="bg-muted/30 flex min-h-screen items-center justify-center px-4 py-10">

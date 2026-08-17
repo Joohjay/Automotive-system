@@ -84,7 +84,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       permissions: user.role.permissions.map((rp) => rp.permission.code),
     }),
     settings: {
-      businessName: settings.businessName ?? 'BennyBlax Enterprises',
+      businessName: settings.businessName ?? 'Blax Enterprises',
       currency: settings.currency ?? 'TZS',
       receiptFooter: settings.receiptFooter ?? '',
     },
@@ -124,7 +124,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
     lastLoginAt: user.lastLoginAt,
     branchName: user.branch.name,
     settings: {
-      businessName: settings.businessName ?? 'BennyBlax Enterprises',
+      businessName: settings.businessName ?? 'Blax Enterprises',
       currency: settings.currency ?? 'TZS',
       receiptFooter: settings.receiptFooter ?? '',
     },

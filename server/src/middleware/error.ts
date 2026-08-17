@@ -48,6 +48,12 @@ export function notFoundHandler(
   next(ApiError.notFound('Requested endpoint does not exist'));
 }
 
+function isPrismaError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const name = err.constructor?.name ?? '';
+  return name.includes('Prisma');
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -73,9 +79,14 @@ export function errorHandler(
     statusCode = 400;
     code = 'INVALID_JSON';
     message = 'Malformed JSON in request body';
+  } else if (isPrismaError(err)) {
+    statusCode = 503;
+    code = 'DATABASE_UNAVAILABLE';
+    message = 'The database is temporarily unavailable. Please try again in a moment.';
+    console.error('[error] database error:', (err as Error).message);
   }
 
-  if (statusCode >= 500) {
+  if (statusCode >= 500 && !isPrismaError(err)) {
     console.error('[error]', err);
   }
 

@@ -162,7 +162,7 @@ async function main() {
 
   // --- Settings (global, branchId = null) ---
   const settings: Record<string, unknown> = {
-    businessName: 'AutoParts Garage',
+    businessName: 'Blax Enterprises',
     currency: 'TZS',
     receiptFooter: 'Thank you for your business!',
   };

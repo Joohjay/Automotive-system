@@ -127,7 +127,7 @@ export const getBusinessSettings = asyncHandler(async (req: Request, res: Respon
   const settings = await getSettings(req.user!.branchId);
   res.json({
     data: {
-      businessName: settings.businessName ?? 'BennyBlax Enterprises',
+      businessName: settings.businessName ?? 'Blax Enterprises',
       currency: settings.currency ?? 'TZS',
       receiptFooter: settings.receiptFooter ?? '',
       address: settings.address ?? null,
