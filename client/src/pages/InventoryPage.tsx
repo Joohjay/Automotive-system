@@ -173,13 +173,20 @@ function AdjustmentDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="adj-reason">Reason</Label>
-            <Input
-              id="adj-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Opening stock, cycle count, damage"
-            />
+            <Label>Reason</Label>
+            <Select value={reason || undefined} onValueChange={(v) => setReason(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select reason" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Stock Count Correction">Stock Count Correction</SelectItem>
+                <SelectItem value="Damaged">Damaged</SelectItem>
+                <SelectItem value="Lost">Lost</SelectItem>
+                <SelectItem value="Found">Found</SelectItem>
+                <SelectItem value="Supplier Error">Supplier Error</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {error ? (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

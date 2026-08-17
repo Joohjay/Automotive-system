@@ -27,6 +27,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       status: true,
       branchId: true,
       roleId: true,
+      failedLoginAttempts: true,
+      lockedUntil: true,
       role: {
         select: { name: true, permissions: { select: { permission: { select: { code: true } } } } },
       },
@@ -38,8 +40,33 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     ApiError.unauthorized('Invalid email or password');
 
   if (!user) throw invalid();
+
+  const LOCKOUT_THRESHOLD = 5;
+  const LOCKOUT_MINUTES = 15;
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const remaining = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+    throw ApiError.forbidden(`Account is locked. Try again in ${remaining} minute${remaining === 1 ? '' : 's'}.`);
+  }
+
   const valid = await bcrypt.compare(input.password, user.passwordHash);
-  if (!valid) throw invalid();
+  if (!valid) {
+    const attempts = (user.failedLoginAttempts ?? 0) + 1;
+    const lockUntil = attempts >= LOCKOUT_THRESHOLD
+      ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
+      : null;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: attempts,
+        ...(lockUntil ? { lockedUntil: lockUntil } : {}),
+      },
+    });
+    if (lockUntil) {
+      throw ApiError.forbidden(`Too many failed attempts. Account locked for ${LOCKOUT_MINUTES} minutes.`);
+    }
+    throw invalid();
+  }
 
   if (user.status !== 'ACTIVE') {
     throw ApiError.forbidden('This account is not active. Contact the administrator.');
@@ -57,7 +84,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date() },
+    data: { lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null },
   });
 
   await recordAudit({

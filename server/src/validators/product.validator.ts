@@ -6,9 +6,11 @@ const money = z.coerce.number().nonnegative('Must be zero or more');
 export const productBase = {
   name: z.string().min(1, 'Product name is required').max(200),
   sku: z.string().min(1, 'SKU is required').max(50),
+  partNumber: z.string().max(100).nullable().optional(),
   categoryId: id,
   brandId: id.nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
+  compatibility: z.string().max(2000).nullable().optional(),
   purchasePrice: money,
   sellingPrice: money,
   minStockLevel: z.coerce.number().int().min(0).default(0),

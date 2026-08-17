@@ -27,6 +27,7 @@ import type { Brand, Category, Product, ProductCreateInput } from '@/types/produ
 interface FormState {
   name: string
   sku: string
+  partNumber: string
   categoryId: string
   brandId: string
   purchasePrice: string
@@ -37,6 +38,7 @@ interface FormState {
   barcode: string
   status: 'ACTIVE' | 'INACTIVE'
   description: string
+  compatibility: string
 }
 
 function EntitySelect({
@@ -144,6 +146,7 @@ function EntitySelect({
 const emptyForm: FormState = {
   name: '',
   sku: '',
+  partNumber: '',
   categoryId: '',
   brandId: '',
   purchasePrice: '',
@@ -154,6 +157,7 @@ const emptyForm: FormState = {
   barcode: '',
   status: 'ACTIVE',
   description: '',
+  compatibility: '',
 }
 
 export function ProductFormDialog({
@@ -181,6 +185,7 @@ export function ProductFormDialog({
         ? {
             name: product.name,
             sku: product.sku,
+            partNumber: product.partNumber ?? '',
             categoryId: product.category?.id ?? '',
             brandId: product.brand?.id ?? '',
             purchasePrice: product.purchasePrice,
@@ -191,6 +196,7 @@ export function ProductFormDialog({
             barcode: product.barcode ?? '',
             status: product.status,
             description: product.description ?? '',
+            compatibility: product.compatibility ?? '',
           }
         : emptyForm,
     )
@@ -220,9 +226,11 @@ export function ProductFormDialog({
     const input: ProductCreateInput = {
       name: form.name.trim(),
       sku: form.sku.trim(),
+      partNumber: form.partNumber.trim() || null,
       categoryId: form.categoryId,
       brandId: form.brandId || null,
       description: form.description || null,
+      compatibility: form.compatibility.trim() || null,
       purchasePrice: form.purchasePrice || '0',
       sellingPrice: form.sellingPrice,
       minStockLevel: Number(form.minStockLevel) || 0,
@@ -275,6 +283,15 @@ export function ProductFormDialog({
                 value={form.sku}
                 onChange={(e) => set('sku', e.target.value)}
                 placeholder="BP-001"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="p-part">Part number (optional)</Label>
+              <Input
+                id="p-part"
+                value={form.partNumber}
+                onChange={(e) => set('partNumber', e.target.value)}
+                placeholder="OEM / manufacturer part #"
               />
             </div>
             <div className="space-y-2">
@@ -387,6 +404,15 @@ export function ProductFormDialog({
                 value={form.description}
                 onChange={(e) => set('description', e.target.value)}
                 placeholder="Optional notes"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="p-compat">Vehicle compatibility (optional)</Label>
+              <Textarea
+                id="p-compat"
+                value={form.compatibility}
+                onChange={(e) => set('compatibility', e.target.value)}
+                placeholder="e.g. Toyota Premio 2007-2012, Allion 2007-2011"
               />
             </div>
           </div>

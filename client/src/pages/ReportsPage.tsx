@@ -435,24 +435,26 @@ export function ReportsPage() {
               <Skeleton className="h-32 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
+              <Skeleton className="h-32 w-full rounded-lg" />
             </div>
           ) : pnlData ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg border bg-card p-6">
                 <p className="text-sm text-muted-foreground">Revenue</p>
                 <p className="mt-1 text-3xl font-bold text-green-600">
-                  {formatMoney(pnlData.revenue ?? pnlData.totalRevenue ?? 0, currency)}
+                  {formatMoney(pnlData.revenue ?? 0, currency)}
                 </p>
-                {pnlData.totalSales != null && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    From {pnlData.totalSales} sale{pnlData.totalSales !== 1 ? 's' : ''}
-                  </p>
-                )}
+              </div>
+              <div className="rounded-lg border bg-card p-6">
+                <p className="text-sm text-muted-foreground">Cost of Goods Sold</p>
+                <p className="mt-1 text-3xl font-bold text-red-600">
+                  {formatMoney(pnlData.cogs ?? 0, currency)}
+                </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
                 <p className="text-sm text-muted-foreground">Expenses</p>
                 <p className="mt-1 text-3xl font-bold text-red-600">
-                  {formatMoney(pnlData.expenses ?? pnlData.totalExpenses ?? 0, currency)}
+                  {formatMoney(pnlData.expenses ?? 0, currency)}
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">

@@ -36,7 +36,9 @@ export interface Product {
   id: string
   name: string
   sku: string
+  partNumber: string | null
   description: string | null
+  compatibility: string | null
   purchasePrice: string
   sellingPrice: string
   minStockLevel: number
@@ -64,9 +66,11 @@ export interface Paginated<T> {
 export interface ProductCreateInput {
   name: string
   sku: string
+  partNumber?: string | null
   categoryId: string
   brandId?: string | null
   description?: string | null
+  compatibility?: string | null
   purchasePrice: string | number
   sellingPrice: string | number
   minStockLevel: number

@@ -50,10 +50,11 @@ export async function notifyStockStatus(
   });
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { name: true, sku: true },
+    select: { name: true, sku: true, partNumber: true },
   });
   if (!product) return;
 
+  const partRef = product.partNumber ? ` (Part #${product.partNumber})` : '';
   const label = type === 'OUT_OF_STOCK' ? 'Out of stock' : 'Low stock';
   for (const user of users) {
     await createNotification({
@@ -61,7 +62,7 @@ export async function notifyStockStatus(
       branchId,
       type,
       title: `${label}: ${product.name}`,
-      message: `${product.name} (${product.sku}) has ${quantityOnHand} units on hand (minimum ${minStockLevel}).`,
+      message: `${product.name} (${product.sku})${partRef} has ${quantityOnHand} units on hand (minimum ${minStockLevel}).`,
       referenceType: 'PRODUCT',
       referenceId: productId,
     });

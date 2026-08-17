@@ -222,9 +222,13 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
       _sum: { total: true },
       where: { branchId, status: 'COMPLETED', saleDate: range },
     }),
-    prisma.saleItem.aggregate({
-      _sum: { lineTotal: true },
-      where: { sale: { branchId, status: 'COMPLETED', saleDate: range } },
+    prisma.inventoryTransaction.aggregate({
+      _sum: { quantity: true },
+      where: {
+        branchId,
+        type: 'SALE',
+        createdAt: range,
+      },
     }),
     prisma.expense.aggregate({
       _sum: { amount: true },
@@ -232,17 +236,33 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
     }),
   ]);
 
+  const saleTransactions = await prisma.inventoryTransaction.findMany({
+    where: {
+      branchId,
+      type: 'SALE',
+      createdAt: range,
+    },
+    select: { quantity: true, unitCost: true },
+  });
+
+  let cogs = 0;
+  for (const tx of saleTransactions) {
+    if (tx.unitCost) {
+      cogs += Math.abs(tx.quantity) * Number(tx.unitCost);
+    }
+  }
+
   const rev = Number(revenue._sum.total ?? 0);
-  const cogs = Number(cogsResult._sum.lineTotal ?? 0);
   const exp = Number(expensesResult._sum.amount ?? 0);
 
   res.json({
     data: {
       period: { from: range.gte, to: range.lte },
       revenue: String(rev),
-      totalSales: String(cogs),
+      cogs: String(cogs),
       expenses: String(exp),
-      netProfit: String(rev - exp),
+      grossProfit: String(rev - cogs),
+      netProfit: String(rev - cogs - exp),
     },
   });
 });

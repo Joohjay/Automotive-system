@@ -39,6 +39,8 @@ export const listProducts = asyncHandler(async (req: Request, res: Response) => 
           OR: [
             { name: { contains: query.search, mode: 'insensitive' } },
             { sku: { contains: query.search, mode: 'insensitive' } },
+            { partNumber: { contains: query.search, mode: 'insensitive' } },
+            { brand: { name: { contains: query.search, mode: 'insensitive' } } },
           ],
         }
       : {}),
@@ -94,7 +96,9 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
   const data: Prisma.ProductCreateInput = {
     name: input.name,
     sku: input.sku.toUpperCase().trim(),
+    partNumber: input.partNumber?.trim() ?? null,
     description: input.description,
+    compatibility: input.compatibility?.trim() ?? null,
     purchasePrice: new Prisma.Decimal(input.purchasePrice),
     sellingPrice: new Prisma.Decimal(input.sellingPrice),
     minStockLevel: input.minStockLevel,
@@ -136,7 +140,9 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
   const data: Prisma.ProductUpdateInput = {};
   if (input.name !== undefined) data.name = input.name;
   if (input.sku !== undefined) data.sku = input.sku.toUpperCase().trim();
+  if (input.partNumber !== undefined) data.partNumber = input.partNumber?.trim() ?? null;
   if (input.description !== undefined) data.description = input.description;
+  if (input.compatibility !== undefined) data.compatibility = input.compatibility?.trim() ?? null;
   if (input.purchasePrice !== undefined) data.purchasePrice = new Prisma.Decimal(input.purchasePrice);
   if (input.sellingPrice !== undefined) data.sellingPrice = new Prisma.Decimal(input.sellingPrice);
   if (input.minStockLevel !== undefined) data.minStockLevel = input.minStockLevel;

@@ -139,7 +139,7 @@ export function ProductsPage() {
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
             className="pl-9"
-            placeholder="Search by name or SKU…"
+            placeholder="Search by name, SKU, part number or brand…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -209,6 +209,7 @@ export function ProductsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>SKU</TableHead>
+                <TableHead>Part #</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Brand</TableHead>
@@ -223,6 +224,7 @@ export function ProductsPage() {
               {products.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-xs">{p.sku}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{p.partNumber ?? '—'}</TableCell>
                   <TableCell className="max-w-64 truncate font-medium">{p.name}</TableCell>
                   <TableCell>{p.category?.name ?? '—'}</TableCell>
                   <TableCell>{p.brand?.name ?? '—'}</TableCell>
