@@ -409,3 +409,61 @@ erDiagram
   over-return rejection, credit account balance lifecycle, credit payments,
   over-payment rejection, and CASHIER RBAC (view OK, create 403, returns OK,
   no-token 401). Suite status: **87 assertions, all passing**.
+
+## Stage 7 — expenses, loans, shifts & reports (completed)
+
+- **Expenses.** `GET/POST /expenses` (requires `expense.view`/`expense.create`)
+  manage operating expenses scoped to a branch. Each expense records a category,
+  description, amount, payment method, optional reference and date. Categories
+  (`GET/POST /expenses/categories`) are branch-scoped but nullable `branchId`
+  allows global categories shared across branches. `GET /expenses/summary`
+  returns current-month and year-to-date totals plus a per-category breakdown.
+  Filters support category, payment method, date range and free-text search on
+  description.
+- **Loans.** `GET/POST /loans` (requires `loan.view`/`loan.manage`) track
+  borrowed funds per branch with lender, principal, interest rate and method
+  (FLAT/REDUCING_BALANCE/FIXED_SCHEDULE), duration, maturity, status
+  (ACTIVE/CLOSED/DEFAULTED/CANCELLED). `POST /loans/:id/schedule` generates a
+  repayment schedule from an array of installments (locked while any exist).
+  `POST /loans/:id/payments` records a payment against a specific installment or
+  the loan generally, updating the schedule's `amountPaid` and status. Closing a
+  loan (`POST /loans/:id/close`) verifies the outstanding balance is zero.
+  `GET /loans/summary` returns aggregate principal, repaid, outstanding and
+  count-by-status.
+- **Shifts.** `GET/POST /shifts/open` (requires `shift.open`) starts a cashier
+  shift; duplicate-open for the same user/branch is rejected with 409.
+  `POST /shifts/:id/close` (requires `shift.close`) calculates expected closing
+  cash by summing CASH payments on COMPLETED sales during the shift window and
+  adds it to the opening cash. Records the difference between expected and
+  actual. `GET /shifts/summary` returns live stats for the current open shift:
+  total sales, cash/MPesa received, transaction count.
+- **Reports.** Four read-only analytics endpoints (all require `report.view`):
+  `GET /reports/sales` (period totals, payment method breakdown, top products,
+  daily series), `GET /reports/inventory` (stock totals, low/out-of-stock
+  counts, per-category), `GET /reports/expenses` (period totals, category and
+  payment method breakdown), `GET /reports/pnl` (revenue, expenses, net
+  profit). All support optional `from`/`to` date range query parameters.
+- **Notifications.** `GET /notifications` lists unread/read notifications for the
+  current user with `unreadCount`. `PATCH /notifications/:id/read` and
+  `POST /notifications/read-all` mark items as read.
+- **Error handling hardened.** The Express error handler now recognises Prisma
+  connection errors and returns 503 `DATABASE_UNAVAILABLE` instead of a generic
+  500. Process-level `unhandledRejection` and `uncaughtException` guards
+  prevent silent server crashes. Startup verifies DB connectivity and warns
+  loudly if unreachable.
+- **Auth fix.** `/auth/login` and `/auth/me` now return a top-level
+  `permissions: string[]` array alongside the user object, fixing a crash where
+  `AuthContext.hasPermission()` called `.includes()` on `undefined`.
+- **Client error boundary.** A React `ErrorBoundary` wraps the app shell so any
+  rendering crash shows a visible red error message with a reload button instead
+  of a blank white page.
+- **Client pages.** `ExpensesPage` (summary cards, filterable expense table with
+  inline category creation, add-expense dialog). `LoansPage` (summary cards,
+  loan table with status badges, create/detail/payment dialogs, schedule viewer,
+  close-loan guard). `ShiftsPage` (active-shift banner with live stats and
+  30-second auto-refresh, open/close dialogs with cash reconciliation and
+  difference display, shifts table with filter tabs). `ReportsPage` (four-tab
+  dashboard: Sales with daily series and top products, Inventory by category,
+  Expenses by category/method, P&L card layout). All modules promoted from
+  "Coming soon" placeholders to fully functional pages; `upcomingModules` is now
+  empty.

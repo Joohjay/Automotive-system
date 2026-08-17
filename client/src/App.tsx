@@ -15,7 +15,10 @@ import { PosPage } from '@/pages/PosPage'
 import { SalesPage } from '@/pages/SalesPage'
 import { ReturnsPage } from '@/pages/ReturnsPage'
 import { CustomersPage } from '@/pages/CustomersPage'
-import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { ExpensesPage } from '@/pages/ExpensesPage'
+import { LoansPage } from '@/pages/LoansPage'
+import { ReportsPage } from '@/pages/ReportsPage'
+import { ShiftsPage } from '@/pages/ShiftsPage'
 
 export default function App() {
   return (
@@ -35,22 +38,10 @@ export default function App() {
               <Route path="sales" element={<SalesPage />} />
               <Route path="returns" element={<ReturnsPage />} />
               <Route path="customers" element={<CustomersPage />} />
-              <Route
-                path="expenses"
-                element={<PlaceholderPage title="Expenses" description="Operational costs and expense categories." />}
-              />
-              <Route
-                path="loans"
-                element={<PlaceholderPage title="Loans" description="Funding sources, lending and loan repayment." />}
-              />
-              <Route
-                path="reports"
-                element={<PlaceholderPage title="Reports" description="Sales, stock and credit analytics." />}
-              />
-              <Route
-                path="shifts"
-                element={<PlaceholderPage title="Shifts" description="Cashier shift management." />}
-              />
+              <Route path="expenses" element={<ExpensesPage />} />
+              <Route path="loans" element={<LoansPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="shifts" element={<ShiftsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Route>

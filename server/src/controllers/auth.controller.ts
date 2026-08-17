@@ -72,6 +72,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   const settings = await getSettings(user.branchId);
 
+  const permissions = user.role.permissions.map((rp) => rp.permission.code);
+
   res.json({
     token,
     user: toAuthUser({
@@ -81,8 +83,9 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       roleId: user.roleId,
       role: user.role,
       branchId: user.branchId,
-      permissions: user.role.permissions.map((rp) => rp.permission.code),
+      permissions,
     }),
+    permissions,
     settings: {
       businessName: settings.businessName ?? 'Blax Enterprises',
       currency: settings.currency ?? 'TZS',
@@ -110,6 +113,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   if (!user) throw ApiError.notFound('User not found');
 
   const settings = await getSettings(user.branchId);
+  const permissions = user.role.permissions.map((rp) => rp.permission.code);
 
   res.json({
     user: toAuthUser({
@@ -119,8 +123,9 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       roleId: user.roleId,
       role: user.role,
       branchId: user.branchId,
-      permissions: user.role.permissions.map((rp) => rp.permission.code),
+      permissions,
     }),
+    permissions,
     lastLoginAt: user.lastLoginAt,
     branchName: user.branch.name,
     settings: {

@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Boxes,
   ClipboardList,
+  DollarSign,
   Gauge,
   Package,
   Receipt,
@@ -32,11 +33,10 @@ export const primaryNav: NavItem[] = [
   { label: 'Sales', href: '/sales', icon: Receipt, description: 'Sales history and voids' },
   { label: 'Returns', href: '/returns', icon: Undo2, description: 'Refunds and restocking' },
   { label: 'Customers', href: '/customers', icon: Users, description: 'Credit accounts and payments' },
+  { label: 'Expenses', href: '/expenses', icon: DollarSign, description: 'Operational costs' },
+  { label: 'Loans', href: '/loans', icon: ClipboardList, description: 'Funding sources and lending' },
+  { label: 'Reports', href: '/reports', icon: Gauge, description: 'Sales and stock analytics' },
+  { label: 'Shifts', href: '/shifts', icon: ClipboardList, description: 'Cashier shift management' },
 ]
 
-export const upcomingModules: NavItem[] = [
-  { label: 'Expenses', href: '/expenses', icon: ClipboardList, description: 'Operational costs' },
-  { label: 'Loans', href: '/loans', icon: Gauge, description: 'Funding sources and lending' },
-  { label: 'Reports', href: '/reports', icon: ClipboardList, description: 'Sales and stock analytics' },
-  { label: 'Shifts', href: '/shifts', icon: Gauge, description: 'Cashier shift management' },
-]
+export const upcomingModules: NavItem[] = []
