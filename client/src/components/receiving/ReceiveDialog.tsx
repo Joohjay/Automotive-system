@@ -13,9 +13,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
 import { getPurchase, receivePurchase } from '@/services/purchase.service'
-import { listLocations } from '@/services/referenceData.service'
+import { listLocations, createLocation } from '@/services/referenceData.service'
 import type { PurchaseDetail } from '@/types/purchase'
 import type { StorageLocation } from '@/types/product'
 
@@ -38,12 +38,17 @@ export function ReceiveDialog({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const [showNewLocation, setShowNewLocation] = useState(false)
+  const [newLocationCode, setNewLocationCode] = useState('')
+  const [newLocationName, setNewLocationName] = useState('')
+
   useEffect(() => {
     if (!open || !purchaseId) return
     setError(null)
     setSaving(false)
     setPurchase(null)
     setLoading(true)
+    setShowNewLocation(false)
     void (async () => {
       try {
         const [p, locs] = await Promise.all([getPurchase(purchaseId), listLocations()])
@@ -70,17 +75,59 @@ export function ReceiveDialog({
   })
   const outstanding = (purchase?.items ?? []).filter((i) => i.quantity - i.receivedQty > 0)
 
+  async function searchLocations(q: string): Promise<SearchableOption[]> {
+    try {
+      const locs = locations.length > 0 ? locations : await listLocations()
+      if (locations.length === 0) setLocations(locs)
+      const lowerQ = q.toLowerCase()
+      return locs
+        .filter((l) => l.code.toLowerCase().includes(lowerQ) || l.name.toLowerCase().includes(lowerQ))
+        .map((l) => ({
+          id: l.id,
+          label: `${l.code} — ${l.name}`,
+          sublabel: l.type || undefined,
+        }))
+    } catch { return [] }
+  }
+
+  async function handleCreateLocation(code: string) {
+    setNewLocationCode(code)
+    setNewLocationName(code)
+    setShowNewLocation(true)
+  }
+
+  async function doCreateLocation() {
+    if (!newLocationCode.trim()) return
+    try {
+      const loc = await createLocation({
+        code: newLocationCode.trim().toUpperCase(),
+        name: newLocationName.trim() || newLocationCode.trim(),
+        type: 'AREA',
+      })
+      setLocations((prev) => [...prev, loc])
+      setLocationId(loc.id)
+      setShowNewLocation(false)
+      toast.success(`Location "${loc.code}" created`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create location')
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!purchase || !locationId) {
-      setError('Select a location.')
-      return
+    if (!purchase || !locationId) { setError('Select a storage location.'); return }
+    if (itemsToReceive.length === 0) { setError('Enter a quantity for at least one item.'); return }
+
+    for (const item of itemsToReceive) {
+      const remaining = item.quantity - item.receivedQty
+      const qty = Number(qtyByItem[item.id]) || 0
+      if (qty > remaining) {
+        setError(`Receiving ${qty} exceeds the remaining ${remaining} for "${item.product?.name}".`)
+        return
+      }
     }
-    if (itemsToReceive.length === 0) {
-      setError('Enter a quantity for at least one item.')
-      return
-    }
+
     setSaving(true)
     try {
       await receivePurchase(purchase.id, {
@@ -115,19 +162,39 @@ export function ReceiveDialog({
         ) : !purchase ? null : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Into location</Label>
-              <Select value={locationId || undefined} onValueChange={setLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.code} — {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Storage location *</Label>
+              {showNewLocation ? (
+                <div className="flex items-end gap-2 rounded-lg border bg-card p-3">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Location code</Label>
+                    <Input
+                      value={newLocationCode}
+                      onChange={(e) => setNewLocationCode(e.target.value)}
+                      placeholder="e.g. RACK-A"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Location name</Label>
+                    <Input
+                      value={newLocationName}
+                      onChange={(e) => setNewLocationName(e.target.value)}
+                      placeholder="e.g. Rack A"
+                    />
+                  </div>
+                  <Button type="button" size="sm" onClick={() => void doCreateLocation()}>Save</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowNewLocation(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <SearchableSelect
+                  value={locationId}
+                  onChange={setLocationId}
+                  onSearch={searchLocations}
+                  onCreateNew={handleCreateLocation}
+                  placeholder="Search location by code or name…"
+                  createNewLabel="Add new location"
+                />
+              )}
             </div>
 
             <div className="rounded-lg border">
@@ -150,12 +217,12 @@ export function ReceiveDialog({
                           {item.product?.name}
                           <span className="text-muted-foreground text-xs"> ({item.product?.sku})</span>
                         </td>
-                        <td className="px-3 py-2 text-right">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right">{item.receivedQty}</td>
-                        <td className="px-3 py-2 text-right">{remaining}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{item.quantity}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{item.receivedQty}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{remaining}</td>
                         <td className="px-3 py-2 text-right">
                           <Input
-                            className="ml-auto h-8 w-20 text-right"
+                            className="ml-auto h-8 w-20 text-right tabular-nums"
                             type="number"
                             min="0"
                             max={remaining}
@@ -175,17 +242,15 @@ export function ReceiveDialog({
             {outstanding.length === 0 ? (
               <p className="text-muted-foreground text-xs">Everything has already been received.</p>
             ) : null}
-            {error ? (
-              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </p>
-            ) : null}
+            {error && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={saving || outstanding.length === 0}>
-                {saving ? <Loader2 className="animate-spin" /> : null}
+                {saving && <Loader2 className="size-4 animate-spin" />}
                 Receive into stock
               </Button>
             </DialogFooter>

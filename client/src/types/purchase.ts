@@ -46,6 +46,7 @@ export interface PurchaseItemInput {
 export interface PurchaseInput {
   supplierId: string
   reference: string
+  purchaseDate?: string | Date
   discount?: string | number
   notes?: string | null
   items: PurchaseItemInput[]
