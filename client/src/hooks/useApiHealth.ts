@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getHealth } from '@/services/health'
 import type { HealthResponse } from '@/types/health'
@@ -8,34 +8,54 @@ type HealthState =
   | { status: 'ok'; data: HealthResponse }
   | { status: 'error'; message: string }
 
-export function useApiHealth(intervalMs = 15_000): HealthState {
-  const [state, setState] = useState<HealthState>({ status: 'loading' })
+let sharedState: HealthState = { status: 'loading' }
+let sharedListeners = new Set<() => void>()
+let sharedTimer: ReturnType<typeof setInterval> | null = null
 
-  useEffect(() => {
-    let cancelled = false
+function notify() {
+  for (const fn of sharedListeners) fn()
+}
 
-    const check = async () => {
-      try {
-        const data = await getHealth()
-        if (!cancelled) setState({ status: 'ok', data })
-      } catch (err) {
-        if (!cancelled) {
-          setState({
-            status: 'error',
-            message: err instanceof Error ? err.message : 'API unreachable',
-          })
-        }
+function startPolling(intervalMs: number) {
+  if (sharedTimer !== null) return
+  const check = async () => {
+    try {
+      const data = await getHealth()
+      sharedState = { status: 'ok', data }
+    } catch (err) {
+      sharedState = {
+        status: 'error',
+        message: err instanceof Error ? err.message : 'API unreachable',
       }
     }
+    notify()
+  }
+  void check()
+  sharedTimer = setInterval(() => void check(), intervalMs)
+}
 
-    void check()
-    const timer = setInterval(() => void check(), intervalMs)
+function stopPolling() {
+  if (sharedTimer !== null) {
+    clearInterval(sharedTimer)
+    sharedTimer = null
+  }
+}
+
+export function useApiHealth(intervalMs = 30_000): HealthState {
+  const [, setTick] = useState(0)
+  const listenerRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    const listener = () => setTick((n) => n + 1)
+    listenerRef.current = listener
+    sharedListeners.add(listener)
+    startPolling(intervalMs)
 
     return () => {
-      cancelled = true
-      clearInterval(timer)
+      if (listenerRef.current) sharedListeners.delete(listenerRef.current)
+      if (sharedListeners.size === 0) stopPolling()
     }
   }, [intervalMs])
 
-  return state
+  return sharedState
 }

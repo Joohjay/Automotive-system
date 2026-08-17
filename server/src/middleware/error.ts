@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import jwt from 'jsonwebtoken';
 
 export class ApiError extends Error {
   readonly statusCode: number;
@@ -79,6 +80,14 @@ export function errorHandler(
     statusCode = 400;
     code = 'INVALID_JSON';
     message = 'Malformed JSON in request body';
+  } else if (err instanceof jwt.TokenExpiredError) {
+    statusCode = 401;
+    code = 'TOKEN_EXPIRED';
+    message = 'Authentication token has expired. Please log in again.';
+  } else if (err instanceof jwt.JsonWebTokenError) {
+    statusCode = 401;
+    code = 'INVALID_TOKEN';
+    message = 'Invalid authentication token';
   } else if (isPrismaError(err)) {
     statusCode = 503;
     code = 'DATABASE_UNAVAILABLE';
