@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useApiHealth } from '@/hooks/useApiHealth'
 import { useAuth } from '@/contexts/AuthContext'
+import { NotificationBell } from '@/components/NotificationBell'
 
 function ConnectionBadge() {
   const health = useApiHealth()
@@ -89,6 +90,7 @@ export function Header() {
       </div>
       <div className="flex items-center gap-3">
         <ConnectionBadge />
+        <NotificationBell />
         <UserMenu />
       </div>
     </header>
