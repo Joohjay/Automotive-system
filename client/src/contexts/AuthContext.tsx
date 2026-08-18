@@ -17,11 +17,13 @@ interface AuthContextValue {
   user: AuthUser | null
   permissions: string[]
   settings: AppSettings | null
+  mustChangePassword: boolean
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   hasPermission: (permission: string) => boolean
+  clearMustChangePassword: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [permissions, setPermissions] = useState<string[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   const clearSession = useCallback(() => {
@@ -37,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setPermissions([])
     setSettings(null)
+    setMustChangePassword(false)
   }, [])
 
   const restoreSession = useCallback(async () => {
@@ -50,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(me.user)
       setPermissions(me.permissions)
       setSettings(me.settings)
+      setMustChangePassword(me.mustChangePassword ?? false)
     } catch {
       clearSession()
     } finally {
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user)
     setPermissions(res.permissions)
     setSettings(res.settings)
+    setMustChangePassword(res.mustChangePassword ?? false)
   }, [])
 
   const logout = useCallback(async () => {
@@ -89,18 +95,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [permissions],
   )
 
+  const clearMustChangePassword = useCallback(() => {
+    setMustChangePassword(false)
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       permissions,
       settings,
+      mustChangePassword,
       isAuthenticated: !!user,
       isLoading,
       login,
       logout,
       hasPermission,
+      clearMustChangePassword,
     }),
-    [user, permissions, settings, isLoading, login, logout, hasPermission],
+    [user, permissions, settings, mustChangePassword, isLoading, login, logout, hasPermission, clearMustChangePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -36,6 +36,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDateTime } from '@/lib/format'
 import { PASSWORD_HINT, validatePassword } from '@/lib/password'
+import { PASSWORD_HINT, validatePassword } from '@/lib/password'
 import {
   adminResetPassword,
   activateUser,
@@ -86,6 +87,7 @@ export function UsersPage() {
 
   const [deactivating, setDeactivating] = useState<AdminUser | null>(null)
   const [resetUser, setResetUser] = useState<AdminUser | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
   const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
@@ -205,13 +207,23 @@ export function UsersPage() {
 
   async function handleResetPassword() {
     if (!resetUser) return
+    if (!resetPassword) {
+      toast.error('Please enter a new password')
+      return
+    }
+    const pwError = validatePassword(resetPassword)
+    if (pwError) {
+      toast.error(pwError)
+      return
+    }
     setResetting(true)
     try {
-      await adminResetPassword(resetUser.id)
-      toast.success('Password reset link sent')
+      await adminResetPassword(resetUser.id, resetPassword)
+      toast.success(`Password reset. New password emailed to ${resetUser.fullName}.`)
       setResetUser(null)
+      setResetPassword('')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send reset link')
+      toast.error(err instanceof Error ? err.message : 'Failed to reset password')
     } finally {
       setResetting(false)
     }
@@ -448,18 +460,29 @@ export function UsersPage() {
       </Dialog>
 
       {/* Reset Password Dialog */}
-      <Dialog open={resetUser !== null} onOpenChange={(open) => { if (!open) { setResetUser(null) } }}>
-        <DialogContent className="sm:max-w-sm">
+      <Dialog open={resetUser !== null} onOpenChange={(open) => { if (!open) { setResetUser(null); setResetPassword('') } }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Send Password Reset</DialogTitle>
+            <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              A password reset link will be sent to {resetUser?.fullName}'s email address ({resetUser?.email}).
+              Set a new password for {resetUser?.fullName} ({resetUser?.email}). The new password will be emailed to them.
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="resetPw">New Password *</Label>
+            <Input
+              id="resetPw"
+              type="password"
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+              placeholder="Enter new password"
+            />
+            <p className="text-muted-foreground text-xs">{PASSWORD_HINT}</p>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setResetUser(null) }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setResetUser(null); setResetPassword('') }}>Cancel</Button>
             <Button onClick={() => void handleResetPassword()} disabled={resetting}>
-              {resetting ? 'Sending…' : 'Send Reset Link'}
+              {resetting ? 'Resetting…' : 'Reset Password'}
             </Button>
           </DialogFooter>
         </DialogContent>

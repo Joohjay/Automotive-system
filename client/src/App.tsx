@@ -26,6 +26,7 @@ import { ShiftsPage } from '@/pages/ShiftsPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { BranchesPage } from '@/pages/BranchesPage'
 import { AccountPage } from '@/pages/AccountPage'
+import { ForcePasswordChangePage } from '@/pages/ForcePasswordChangePage'
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<ProtectedRoute />}>
+            <Route path="force-password-change" element={<ForcePasswordChangePage />} />
             <Route element={<AppShell />}>
               <Route index element={<DashboardPage />} />
               <Route element={<RequirePermission permission="sale.create" />}>

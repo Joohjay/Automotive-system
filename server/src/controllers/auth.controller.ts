@@ -37,6 +37,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       roleId: true,
       failedLoginAttempts: true,
       lockedUntil: true,
+      mustChangePassword: true,
       role: {
         select: { name: true, permissions: { select: { permission: { select: { code: true } } } } },
       },
@@ -135,6 +136,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   res.json({
     token,
+    mustChangePassword: user.mustChangePassword,
     user: toAuthUser({
       id: user.id,
       email: user.email,
@@ -163,6 +165,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       phone: true,
       status: true,
       lastLoginAt: true,
+      mustChangePassword: true,
       branchId: true,
       roleId: true,
       branch: { select: { name: true, code: true } },
@@ -184,6 +187,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       branchId: user.branchId,
       permissions,
     }),
+    mustChangePassword: user.mustChangePassword,
     permissions,
     lastLoginAt: user.lastLoginAt,
     branchName: user.branch.name,

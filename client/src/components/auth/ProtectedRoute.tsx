@@ -4,12 +4,15 @@ import { useAuth } from '@/contexts/AuthContext'
 import { FullPageLoader } from '@/components/ui/full-page-loader'
 
 export function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, mustChangePassword } = useAuth()
   const location = useLocation()
 
   if (isLoading) return <FullPageLoader />
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+  if (mustChangePassword && location.pathname !== '/force-password-change') {
+    return <Navigate to="/force-password-change" replace />
   }
   return <Outlet />
 }

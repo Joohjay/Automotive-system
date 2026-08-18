@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 
 import app from './app.js';
 import { config } from './config/env.js';
+import { verifyConnection } from './services/email.service.js';
 import prisma from './lib/prisma.js';
 
 process.on('unhandledRejection', (reason: unknown) => {
@@ -25,6 +26,8 @@ server.listen(config.port, async () => {
   } catch {
     console.warn('[autoparts-api] WARNING: database is unreachable on startup — login/data endpoints will fail until it is available');
   }
+
+  await verifyConnection();
 });
 
 async function shutdown(signal: string): Promise<void> {

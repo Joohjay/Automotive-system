@@ -15,6 +15,7 @@ export interface AppSettings {
 
 export interface AuthResponse {
   token: string
+  mustChangePassword: boolean
   user: AuthUser
   permissions: string[]
   settings: AppSettings
@@ -22,6 +23,7 @@ export interface AuthResponse {
 
 export interface MeResponse {
   user: AuthUser
+  mustChangePassword: boolean
   permissions: string[]
   lastLoginAt: string | null
   branchName: string

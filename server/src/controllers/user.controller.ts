@@ -346,45 +346,39 @@ export const adminResetPassword = asyncHandler(async (req: Request, res: Respons
   });
   if (!existing) throw ApiError.notFound('User not found');
 
-  parseBody(adminResetPasswordSchema, req.body);
+  const input = parseBody(adminResetPasswordSchema, req.body);
 
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  const BCRYPT_COST = 12;
+  const newHash = await bcrypt.hash(input.password, BCRYPT_COST);
 
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: existing.id,
-      tokenHash,
-      expiresAt,
-    },
+  await prisma.user.update({
+    where: { id: existing.id },
+    data: { passwordHash: newHash, mustChangePassword: true },
   });
 
-  const resetUrl = `${config.clientOrigin}/reset-password?token=${rawToken}`;
-
   if (config.emailProvider === 'console') {
-    console.log(`\n========== PASSWORD RESET (DEV MODE) ==========`);
+    console.log(`\n========== ADMIN PASSWORD RESET (DEV MODE) ==========`);
     console.log(`User: ${existing.email}`);
-    console.log(`Reset URL: ${resetUrl}`);
-    console.log(`================================================\n`);
+    console.log(`New password set by admin. User must change on next login.`);
+    console.log(`======================================================\n`);
   } else {
     await sendEmail({
       to: existing.email,
-      subject: 'Password Reset Request — BennyBlax Enterprises',
-      html: `<p>Hello ${existing.fullName},</p><p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
-      text: `Hello ${existing.fullName},\n\nUse this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.`,
+      subject: 'Your Password Has Been Reset — BennyBlax Enterprises',
+      html: `<p>Hello ${existing.fullName},</p><p>Your password has been reset by the administrator.</p><p>Your new temporary password is:</p><p style="font-size:16px;font-weight:bold;padding:8px 12px;background:#f4f4f5;border-radius:6px;display:inline-block;">${input.password}</p><p style="margin-top:16px;">You will be asked to change this password when you sign in.</p><p>If you did not expect this, please contact the system administrator.</p>`,
+      text: `Hello ${existing.fullName},\n\nYour password has been reset by the administrator.\nYour new temporary password is: ${input.password}\n\nYou will be asked to change this password when you sign in.\n\nIf you did not expect this, please contact the system administrator.`,
     });
   }
 
   await recordAudit({
     userId: req.user!.id,
     branchId: req.user!.branchId,
-    action: 'ADMIN_PASSWORD_RESET_INITIATED',
+    action: 'ADMIN_PASSWORD_RESET_COMPLETED',
     entityType: 'User',
     entityId: existing.id,
     ipAddress: clientIp(req),
     userAgent: req.headers['user-agent'],
   });
 
-  res.json({ message: 'Password reset link has been sent' });
+  res.json({ message: 'Password has been reset. The user will be asked to change it on next login.' });
 });

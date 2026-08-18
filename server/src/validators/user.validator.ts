@@ -30,4 +30,6 @@ export const userListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const adminResetPasswordSchema = z.object({});
+export const adminResetPasswordSchema = z.object({
+  password: z.string().regex(PASSWORD_REGEX, PASSWORD_MESSAGE),
+});
