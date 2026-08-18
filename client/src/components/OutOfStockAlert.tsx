@@ -28,7 +28,7 @@ export function OutOfStockAlert({
 
   const handleView = () => {
     onOpenChange(false)
-    navigate('/inventory')
+    navigate('/inventory?filter=out_of_stock')
   }
 
   return (

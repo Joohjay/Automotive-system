@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Boxes, Loader2, PackageSearch, PackageX, SlidersHorizontal, Wrench } from 'lucide-react'
+import { Boxes, Loader2, PackageSearch, PackageX, SlidersHorizontal, X, Wrench } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -237,6 +237,14 @@ export function InventoryPage() {
     [stockRows],
   )
 
+  const stockFilter = searchParams.get('filter')
+  const filteredStockRows = useMemo(() => {
+    if (stockFilter === 'out_of_stock') {
+      return stockRows.filter((r) => r.quantityOnHand <= 0)
+    }
+    return stockRows
+  }, [stockRows, stockFilter])
+
   useEffect(() => {
     void (async () => {
       setLoadingSummary(true)
@@ -303,6 +311,23 @@ export function InventoryPage() {
           <TabsTrigger value="ledger">Movement ledger</TabsTrigger>
         </TabsList>
 
+        {stockFilter === 'out_of_stock' ? (
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm">
+            <PackageX className="size-4 text-red-600" />
+            <span className="font-medium text-red-700">Showing out-of-stock items only</span>
+            <span className="text-muted-foreground">({filteredStockRows.length} product{filteredStockRows.length === 1 ? '' : 's'})</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto gap-1 text-red-600 hover:text-red-700"
+              onClick={() => setSearchParams({})}
+            >
+              <X className="size-3" />
+              Clear filter
+            </Button>
+          </div>
+        ) : null}
+
         <TabsContent value="overview" className="mt-4 space-y-6">
           {loadingSummary || !summary ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -321,9 +346,13 @@ export function InventoryPage() {
 
           <div className="rounded-xl border bg-card">
             <div className="border-b px-5 py-4">
-              <h2 className="text-sm font-semibold">Low stock alerts</h2>
+              <h2 className="text-sm font-semibold">
+                {stockFilter === 'out_of_stock' ? 'Out-of-stock items' : 'Low stock alerts'}
+              </h2>
               <p className="text-muted-foreground text-xs">
-                Items at or below their minimum stock level
+                {stockFilter === 'out_of_stock'
+                  ? 'Products with zero quantity on hand'
+                  : 'Items at or below their minimum stock level'}
               </p>
             </div>
             {loadingSummary ? (
@@ -332,8 +361,8 @@ export function InventoryPage() {
                   <Skeleton key={i} className="h-9 w-full" />
                 ))}
               </div>
-            ) : lowStockRows.length === 0 ? (
-              <EmptyState icon={PackageSearch} title="All stock levels healthy" />
+            ) : filteredStockRows.length === 0 ? (
+              <EmptyState icon={PackageSearch} title={stockFilter === 'out_of_stock' ? 'No out-of-stock items' : 'All stock levels healthy'} />
             ) : (
               <Table>
                 <TableHeader>
@@ -347,7 +376,7 @@ export function InventoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lowStockRows.map((r) => (
+                  {filteredStockRows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs">{r.product.sku}</TableCell>
                       <TableCell className="font-medium">{r.product.name}</TableCell>
