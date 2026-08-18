@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, DollarSign, Package, Receipt } from 'lucide-react'
+import { BarChart3, Package, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,15 +7,14 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney, formatDate } from '@/lib/format'
-import { getSalesReport, getInventoryReport, getExpenseReport, getProfitLoss } from '@/services/report.service'
+import { getSalesReport, getInventoryReport, getExpenseReport } from '@/services/report.service'
 
-type Tab = 'sales' | 'inventory' | 'expenses' | 'pnl'
+type Tab = 'sales' | 'inventory' | 'expenses'
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'sales', label: 'Sales', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
   { key: 'inventory', label: 'Inventory', icon: <Package className="mr-2 h-4 w-4" /> },
   { key: 'expenses', label: 'Expenses', icon: <Receipt className="mr-2 h-4 w-4" /> },
-  { key: 'pnl', label: 'P&L', icon: <DollarSign className="mr-2 h-4 w-4" /> },
 ]
 
 function SkeletonTable({ rows = 4 }: { rows?: number }) {
@@ -56,11 +55,6 @@ export function ReportsPage() {
   const [expenseData, setExpenseData] = useState<any>(null)
   const [expenseFrom, setExpenseFrom] = useState('')
   const [expenseTo, setExpenseTo] = useState('')
-
-  const [pnlLoading, setPnlLoading] = useState(false)
-  const [pnlData, setPnlData] = useState<any>(null)
-  const [pnlFrom, setPnlFrom] = useState('')
-  const [pnlTo, setPnlTo] = useState('')
 
   const fetchSales = useCallback(async () => {
     try {
@@ -104,27 +98,11 @@ export function ReportsPage() {
     }
   }, [expenseFrom, expenseTo])
 
-  const fetchPnl = useCallback(async () => {
-    try {
-      setPnlLoading(true)
-      const params: Record<string, string> = {}
-      if (pnlFrom) params.from = pnlFrom
-      if (pnlTo) params.to = pnlTo
-      const res = await getProfitLoss(params)
-      setPnlData((res as any).data)
-    } catch {
-      toast.error('Failed to load profit & loss report')
-    } finally {
-      setPnlLoading(false)
-    }
-  }, [pnlFrom, pnlTo])
-
   useEffect(() => {
     if (activeTab === 'sales') fetchSales()
     else if (activeTab === 'inventory') fetchInventory()
     else if (activeTab === 'expenses') fetchExpenses()
-    else if (activeTab === 'pnl') fetchPnl()
-  }, [activeTab, fetchSales, fetchInventory, fetchExpenses, fetchPnl])
+  }, [activeTab, fetchSales, fetchInventory, fetchExpenses])
 
   return (
     <div className="space-y-6">
@@ -410,69 +388,6 @@ export function ReportsPage() {
             </div>
           ) : (
             <SkeletonCards count={1} />
-          )}
-        </div>
-      )}
-
-      {activeTab === 'pnl' && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="text-sm font-medium">From</label>
-              <Input type="date" value={pnlFrom} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPnlFrom(e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <label className="text-sm font-medium">To</label>
-              <Input type="date" value={pnlTo} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPnlTo(e.target.value)} className="mt-1" />
-            </div>
-            <Button onClick={fetchPnl} disabled={pnlLoading}>
-              Apply
-            </Button>
-          </div>
-
-          {pnlLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </div>
-          ) : pnlData ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border bg-card p-6">
-                <p className="text-sm text-muted-foreground">Revenue</p>
-                <p className="mt-1 text-3xl font-bold text-green-600">
-                  {formatMoney(pnlData.revenue ?? 0, currency)}
-                </p>
-              </div>
-              <div className="rounded-lg border bg-card p-6">
-                <p className="text-sm text-muted-foreground">Cost of Goods Sold</p>
-                <p className="mt-1 text-3xl font-bold text-red-600">
-                  {formatMoney(pnlData.cogs ?? 0, currency)}
-                </p>
-              </div>
-              <div className="rounded-lg border bg-card p-6">
-                <p className="text-sm text-muted-foreground">Expenses</p>
-                <p className="mt-1 text-3xl font-bold text-red-600">
-                  {formatMoney(pnlData.expenses ?? 0, currency)}
-                </p>
-              </div>
-              <div className="rounded-lg border bg-card p-6">
-                <p className="text-sm text-muted-foreground">Net Profit</p>
-                <p
-                  className={`mt-1 text-3xl font-bold ${
-                    (pnlData.netProfit ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {formatMoney(pnlData.netProfit ?? 0, currency)}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </div>
           )}
         </div>
       )}

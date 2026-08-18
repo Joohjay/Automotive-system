@@ -21,6 +21,7 @@ import { CustomersPage } from '@/pages/CustomersPage'
 import { ExpensesPage } from '@/pages/ExpensesPage'
 import { LoansPage } from '@/pages/LoansPage'
 import { ReportsPage } from '@/pages/ReportsPage'
+import { ProfitLossPage } from '@/pages/ProfitLossPage'
 import { ShiftsPage } from '@/pages/ShiftsPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { BranchesPage } from '@/pages/BranchesPage'
@@ -70,6 +71,9 @@ export default function App() {
               </Route>
               <Route element={<RequirePermission permission="report.view" />}>
                 <Route path="reports" element={<ReportsPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="report.view" />}>
+                <Route path="pnl" element={<ProfitLossPage />} />
               </Route>
               <Route element={<RequirePermission permission="shift.open" />}>
                 <Route path="shifts" element={<ShiftsPage />} />
