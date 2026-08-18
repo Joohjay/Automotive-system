@@ -40,6 +40,7 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
               name: true,
               sku: true,
               partNumber: true,
+              brand: { select: { name: true } },
             },
           },
           location: { select: { code: true, name: true } },
@@ -67,6 +68,7 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
     name: string;
     sku: string;
     partNumber: string | null;
+    brand: string | null;
     quantityOnHand: number;
     locationCode: string;
     locationName: string;
@@ -81,6 +83,7 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
         name: inv.product.name,
         sku: inv.product.sku,
         partNumber: inv.product.partNumber ?? null,
+        brand: inv.product.brand?.name ?? null,
         quantityOnHand: inv.quantityOnHand,
         locationCode: inv.location.code,
         locationName: inv.location.name,

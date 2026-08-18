@@ -146,6 +146,9 @@ export function DashboardPage() {
                       SKU: {item.sku}
                       {item.partNumber ? <> · Part #: {item.partNumber}</> : null}
                     </p>
+                    {item.brand ? (
+                      <p className="text-muted-foreground text-xs">Brand: {item.brand}</p>
+                    ) : null}
                     <p className="text-muted-foreground text-xs">
                       {item.locationCode} — {item.locationName}
                     </p>
@@ -155,7 +158,7 @@ export function DashboardPage() {
               ))}
             </div>
             <div className="mt-3">
-              <Link to="/inventory" className="text-sm font-medium text-red-600 hover:underline">
+              <Link to="/inventory?filter=out_of_stock" className="text-sm font-medium text-red-600 hover:underline">
                 View all in inventory →
               </Link>
             </div>

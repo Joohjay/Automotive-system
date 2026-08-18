@@ -23,6 +23,7 @@ export interface OutOfStockItem {
   name: string
   sku: string
   partNumber: string | null
+  brand: string | null
   quantityOnHand: number
   locationCode: string
   locationName: string

@@ -232,7 +232,7 @@ export function InventoryPage() {
   const lowStockRows = useMemo(
     () =>
       stockRows.filter(
-        (r) => r.quantityOnHand <= r.product.minStockLevel,
+        (r) => r.quantityOnHand > 0 && r.quantityOnHand <= r.product.minStockLevel,
       ),
     [stockRows],
   )
@@ -242,8 +242,8 @@ export function InventoryPage() {
     if (stockFilter === 'out_of_stock') {
       return stockRows.filter((r) => r.quantityOnHand <= 0)
     }
-    return stockRows
-  }, [stockRows, stockFilter])
+    return lowStockRows
+  }, [stockRows, lowStockRows, stockFilter])
 
   useEffect(() => {
     void (async () => {

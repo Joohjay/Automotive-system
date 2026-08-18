@@ -57,6 +57,9 @@ export function OutOfStockAlert({
                   SKU: {item.sku}
                   {item.partNumber ? <> · Part #: {item.partNumber}</> : null}
                 </p>
+                {item.brand ? (
+                  <p className="text-muted-foreground text-xs">Brand: {item.brand}</p>
+                ) : null}
                 <p className="text-muted-foreground text-xs">
                   {item.locationCode} — {item.locationName}
                 </p>
