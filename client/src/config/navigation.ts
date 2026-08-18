@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Boxes,
+  Building2,
   ClipboardList,
   DollarSign,
   Gauge,
@@ -9,6 +10,7 @@ import {
   ShoppingCart,
   Truck,
   Undo2,
+  UserCog,
   Users,
 } from 'lucide-react'
 
@@ -39,6 +41,8 @@ export const primaryNav: NavItem[] = [
   { label: 'Loans', href: '/loans', icon: ClipboardList, description: 'Funding sources and lending', permission: 'loan.view' },
   { label: 'Reports', href: '/reports', icon: Gauge, description: 'Sales and stock analytics', permission: 'report.view' },
   { label: 'Shifts', href: '/shifts', icon: ClipboardList, description: 'Cashier shift management', permission: 'shift.open' },
+  { label: 'Users', href: '/admin/users', icon: UserCog, description: 'User accounts and roles', permission: 'user.view' },
+  { label: 'Branches', href: '/admin/branches', icon: Building2, description: 'Branch management', permission: 'branch.view' },
 ]
 
 export const upcomingModules: NavItem[] = []

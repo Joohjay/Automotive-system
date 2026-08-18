@@ -7,6 +7,8 @@ import { RequirePermission } from '@/components/auth/ProtectedRoute'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LoginPage } from '@/pages/LoginPage'
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { InventoryPage } from '@/pages/InventoryPage'
@@ -20,6 +22,9 @@ import { ExpensesPage } from '@/pages/ExpensesPage'
 import { LoansPage } from '@/pages/LoansPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { ShiftsPage } from '@/pages/ShiftsPage'
+import { UsersPage } from '@/pages/UsersPage'
+import { BranchesPage } from '@/pages/BranchesPage'
+import { AccountPage } from '@/pages/AccountPage'
 
 export default function App() {
   return (
@@ -28,6 +33,8 @@ export default function App() {
         <Toaster position="top-right" richColors closeButton />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route index element={<DashboardPage />} />
@@ -66,6 +73,13 @@ export default function App() {
               </Route>
               <Route element={<RequirePermission permission="shift.open" />}>
                 <Route path="shifts" element={<ShiftsPage />} />
+              </Route>
+              <Route path="account" element={<AccountPage />} />
+              <Route element={<RequirePermission permission="user.view" />}>
+                <Route path="admin/users" element={<UsersPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="branch.view" />}>
+                <Route path="admin/branches" element={<BranchesPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

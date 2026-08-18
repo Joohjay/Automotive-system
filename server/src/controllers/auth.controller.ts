@@ -1,14 +1,22 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 
 import prisma from '../lib/prisma.js';
+import { config } from '../config/env.js';
 import { signAccessToken, toAuthUser } from '../lib/token.js';
 import { ApiError } from '../middleware/error.js';
 import { recordAudit } from '../services/audit.service.js';
+import { sendEmail } from '../services/email.service.js';
 import { getSettings } from '../services/settings.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { parseBody } from '../utils/validate.js';
-import { loginSchema } from '../validators/auth.validator.js';
+import {
+  changePasswordSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+} from '../validators/auth.validator.js';
 
 function clientIp(req: Request): string | undefined {
   return req.ip ?? req.headers['x-forwarded-for']?.toString();
@@ -177,4 +185,142 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
   }
   // Stateless JWT: the client discards the token.
   res.status(204).send();
+});
+
+const BCRYPT_COST = 12;
+
+export const changePassword = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(changePasswordSchema, req.body);
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, passwordHash: true },
+  });
+  if (!user) throw ApiError.notFound('User not found');
+
+  const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!valid) throw ApiError.badRequest('Current password is incorrect');
+
+  const newHash = await bcrypt.hash(input.newPassword, BCRYPT_COST);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: newHash },
+  });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'PASSWORD_CHANGED',
+    entityType: 'User',
+    entityId: user.id,
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
+  res.json({ message: 'Password changed successfully' });
+});
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(forgotPasswordSchema, req.body);
+
+  const user = await prisma.user.findUnique({
+    where: { email: input.email.toLowerCase() },
+    select: { id: true, email: true, fullName: true, status: true },
+  });
+
+  // Always return the same message to prevent email enumeration
+  const genericMessage = 'If an account exists with that email, a reset link has been sent.';
+
+  if (!user) {
+    res.json({ message: genericMessage });
+    return;
+  }
+
+  if (user.status !== 'ACTIVE') {
+    res.json({ message: genericMessage });
+    return;
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    },
+  });
+
+  const resetUrl = `${config.clientOrigin}/reset-password?token=${rawToken}`;
+
+  if (config.emailProvider === 'console') {
+    console.log(`\n========== PASSWORD RESET (DEV MODE) ==========`);
+    console.log(`User: ${user.email}`);
+    console.log(`Reset URL: ${resetUrl}`);
+    console.log(`================================================\n`);
+  } else {
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset Request — BennyBlax Enterprises',
+      html: `<p>Hello ${user.fullName},</p><p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
+      text: `Hello ${user.fullName},\n\nUse this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour. If you did not request this, ignore this email.`,
+    });
+  }
+
+  await recordAudit({
+    userId: user.id,
+    action: 'PASSWORD_RESET_REQUESTED',
+    entityType: 'User',
+    entityId: user.id,
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
+  res.json({ message: genericMessage });
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseBody(resetPasswordSchema, req.body);
+
+  const tokenHash = crypto.createHash('sha256').update(input.token).digest('hex');
+
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!resetToken) {
+    throw ApiError.badRequest('Invalid or expired reset token');
+  }
+  if (resetToken.usedAt) {
+    throw ApiError.badRequest('This reset token has already been used');
+  }
+  if (resetToken.expiresAt < new Date()) {
+    throw ApiError.badRequest('This reset token has expired');
+  }
+
+  const newHash = await bcrypt.hash(input.newPassword, BCRYPT_COST);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash: newHash },
+    });
+    await tx.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    });
+  });
+
+  await recordAudit({
+    userId: resetToken.userId,
+    action: 'PASSWORD_RESET_COMPLETED',
+    entityType: 'User',
+    entityId: resetToken.userId,
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
+  res.json({ message: 'Password has been reset successfully' });
 });

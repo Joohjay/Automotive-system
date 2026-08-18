@@ -16,6 +16,8 @@ import loanRouter from './loans.js';
 import shiftRouter from './shifts.js';
 import reportRouter from './reports.js';
 import notificationRouter from './notifications.js';
+import usersRouter from './users.js';
+import branchesRouter from './branches.js';
 
 const router = Router();
 
@@ -34,6 +36,8 @@ router.use('/loans', loanRouter);
 router.use('/shifts', shiftRouter);
 router.use('/reports', reportRouter);
 router.use('/notifications', notificationRouter);
+router.use('/users', usersRouter);
+router.use('/branches', branchesRouter);
 
 if (config.isDevelopment) {
   const devRouter = (await import('./dev.js')).default;

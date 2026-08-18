@@ -15,6 +15,7 @@ const envSchema = z.object({
     .string()
     .min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('8h'),
+  EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -41,4 +42,5 @@ export const config = {
     secret: parsed.data.JWT_SECRET,
     expiresIn: parsed.data.JWT_EXPIRES_IN,
   },
+  emailProvider: parsed.data.EMAIL_PROVIDER,
 } as const;

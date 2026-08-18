@@ -5,9 +5,11 @@ import {
   createCategory,
   createLocation,
   getBusinessSettings,
+  listBranchesRef,
   listBrands,
   listCategories,
   listLocations,
+  listRoles,
   updateBrand,
   updateCategory,
   updateLocation,
@@ -31,5 +33,9 @@ router.post('/locations', requirePermission('product.create'), createLocation);
 router.put('/locations/:id', requirePermission('product.update'), updateLocation);
 
 router.get('/settings', getBusinessSettings);
+
+router.get('/roles', listRoles);
+
+router.get('/branches', listBranchesRef);
 
 export default router;

@@ -136,3 +136,20 @@ export const getBusinessSettings = asyncHandler(async (req: Request, res: Respon
     },
   });
 });
+
+export const listRoles = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await prisma.role.findMany({
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true },
+  });
+  res.json({ data });
+});
+
+export const listBranchesRef = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await prisma.branch.findMany({
+    where: { status: 'ACTIVE' },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, code: true },
+  });
+  res.json({ data });
+});

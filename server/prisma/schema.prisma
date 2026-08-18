@@ -242,6 +242,8 @@ model User {
   branch Branch @relation(fields: [branchId], references: [id])
   role   Role   @relation(fields: [roleId], references: [id])
 
+  passwordResetTokens PasswordResetToken[]
+
   createdPurchases             Purchase[]
   createdSales                 Sale[]
   createdReturns               Return[]
@@ -869,4 +871,17 @@ model Setting {
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([branchId, key])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId])
 }

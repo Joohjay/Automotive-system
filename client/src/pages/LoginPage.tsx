@@ -123,6 +123,11 @@ export function LoginPage() {
                   {isSubmitting ? <Loader2 className="animate-spin" /> : null}
                   {isSubmitting ? 'Signing in…' : 'Sign in'}
                 </Button>
+                <div className="text-center text-sm">
+                  <a href="/forgot-password" className="text-primary hover:underline">
+                    Forgot password?
+                  </a>
+                </div>
               </form>
             </CardContent>
           </Card>
