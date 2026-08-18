@@ -25,6 +25,10 @@ const txQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+const stockQuerySchema = z.object({
+  filter: z.enum(['out_of_stock']).optional(),
+});
+
 export const getSummary = asyncHandler(async (req: Request, res: Response) => {
   const branchId = req.user!.branchId;
 
@@ -195,8 +199,15 @@ export const createAdjustment = asyncHandler(async (req: Request, res: Response)
 
 export const listStock = asyncHandler(async (req: Request, res: Response) => {
   const branchId = req.user!.branchId;
+  const { filter } = parseQuery(stockQuerySchema, req.query);
+
+  const where: Prisma.InventoryWhereInput = {
+    branchId,
+    ...(filter === 'out_of_stock' ? { quantityOnHand: 0 } : {}),
+  };
+
   const rows = await prisma.inventory.findMany({
-    where: { branchId },
+    where,
     include: {
       product: {
         select: {

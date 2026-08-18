@@ -35,7 +35,10 @@ export async function createAdjustment(input: {
   return res.data
 }
 
-export async function listStock(): Promise<StockRow[]> {
-  const res = await apiRequest<{ data: StockRow[] }>('/inventory/stock')
+export async function listStock(params: { filter?: string } = {}): Promise<StockRow[]> {
+  const qs = new URLSearchParams()
+  if (params.filter) qs.set('filter', params.filter)
+  const s = qs.toString()
+  const res = await apiRequest<{ data: StockRow[] }>(`/inventory/stock${s ? `?${s}` : ''}`)
   return res.data
 }

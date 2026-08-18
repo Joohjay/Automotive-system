@@ -229,27 +229,20 @@ export function InventoryPage() {
   )
   const preSelectedProduct = searchParams.get('product') ?? undefined
 
-  const lowStockRows = useMemo(
-    () =>
-      stockRows.filter(
-        (r) => r.quantityOnHand > 0 && r.quantityOnHand <= r.product.minStockLevel,
-      ),
-    [stockRows],
-  )
-
   const stockFilter = searchParams.get('filter')
-  const filteredStockRows = useMemo(() => {
-    if (stockFilter === 'out_of_stock') {
-      return stockRows.filter((r) => r.quantityOnHand <= 0)
-    }
-    return lowStockRows
-  }, [stockRows, lowStockRows, stockFilter])
+  const displayRows = useMemo(() => {
+    if (stockFilter === 'out_of_stock') return stockRows
+    return stockRows.filter((r) => r.quantityOnHand > 0 && r.quantityOnHand <= r.product.minStockLevel)
+  }, [stockRows, stockFilter])
 
   useEffect(() => {
     void (async () => {
       setLoadingSummary(true)
       try {
-        const [s, rows] = await Promise.all([getInventorySummary(), listStock()])
+        const [s, rows] = await Promise.all([
+          getInventorySummary(),
+          listStock(stockFilter === 'out_of_stock' ? { filter: 'out_of_stock' } : {}),
+        ])
         setSummary(s)
         setStockRows(rows)
       } catch {
@@ -258,7 +251,7 @@ export function InventoryPage() {
         setLoadingSummary(false)
       }
     })()
-  }, [adjustOpen])
+  }, [adjustOpen, stockFilter])
 
   const loadTransactions = useCallback(async () => {
     setLoadingTx(true)
@@ -315,7 +308,7 @@ export function InventoryPage() {
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm">
             <PackageX className="size-4 text-red-600" />
             <span className="font-medium text-red-700">Showing out-of-stock items only</span>
-            <span className="text-muted-foreground">({filteredStockRows.length} product{filteredStockRows.length === 1 ? '' : 's'})</span>
+            <span className="text-muted-foreground">({displayRows.length} product{displayRows.length === 1 ? '' : 's'})</span>
             <Button
               variant="ghost"
               size="sm"
@@ -361,7 +354,7 @@ export function InventoryPage() {
                   <Skeleton key={i} className="h-9 w-full" />
                 ))}
               </div>
-            ) : filteredStockRows.length === 0 ? (
+            ) : displayRows.length === 0 ? (
               <EmptyState icon={PackageSearch} title={stockFilter === 'out_of_stock' ? 'No out-of-stock items' : 'All stock levels healthy'} />
             ) : (
               <Table>
@@ -376,7 +369,7 @@ export function InventoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStockRows.map((r) => (
+                  {displayRows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs">{r.product.sku}</TableCell>
                       <TableCell className="font-medium">{r.product.name}</TableCell>
