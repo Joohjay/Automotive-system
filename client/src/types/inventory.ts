@@ -18,11 +18,22 @@ export interface InventoryTransaction {
   location: { name: string; code: string } | null
 }
 
+export interface OutOfStockItem {
+  productId: string
+  name: string
+  sku: string
+  partNumber: string | null
+  quantityOnHand: number
+  locationCode: string
+  locationName: string
+}
+
 export interface InventorySummary {
   totalProducts: number
   totalUnits: number
   lowStock: number
   outOfStock: number
+  outOfStockItems: OutOfStockItem[]
   recentReceived: InventoryTransaction[]
   recentMovements: InventoryTransaction[]
 }
@@ -34,6 +45,7 @@ export interface StockRow {
     id: string
     name: string
     sku: string
+    partNumber: string | null
     sellingPrice: string
     minStockLevel: number
     status: string

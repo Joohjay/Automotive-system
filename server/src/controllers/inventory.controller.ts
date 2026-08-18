@@ -33,7 +33,17 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
       prisma.product.count({ where: { status: 'ACTIVE' } }),
       prisma.inventory.findMany({
         where: { branchId },
-        include: { product: { select: { minStockLevel: true, name: true } } },
+        include: {
+          product: {
+            select: {
+              minStockLevel: true,
+              name: true,
+              sku: true,
+              partNumber: true,
+            },
+          },
+          location: { select: { code: true, name: true } },
+        },
       }),
       prisma.inventoryTransaction.findMany({
         where: { branchId, type: { in: ['PURCHASE', 'RETURN'] } },
@@ -52,10 +62,30 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
   let totalUnits = 0;
   let lowStock = 0;
   let outOfStock = 0;
+  const outOfStockItems: Array<{
+    productId: string;
+    name: string;
+    sku: string;
+    partNumber: string | null;
+    quantityOnHand: number;
+    locationCode: string;
+    locationName: string;
+  }> = [];
+
   for (const inv of inventoryRows) {
     totalUnits += inv.quantityOnHand;
-    if (inv.quantityOnHand <= 0) outOfStock += 1;
-    else if (inv.quantityOnHand <= inv.product.minStockLevel) lowStock += 1;
+    if (inv.quantityOnHand <= 0) {
+      outOfStock += 1;
+      outOfStockItems.push({
+        productId: inv.productId,
+        name: inv.product.name,
+        sku: inv.product.sku,
+        partNumber: inv.product.partNumber ?? null,
+        quantityOnHand: inv.quantityOnHand,
+        locationCode: inv.location.code,
+        locationName: inv.location.name,
+      });
+    } else if (inv.quantityOnHand <= inv.product.minStockLevel) lowStock += 1;
   }
 
   res.json({
@@ -64,6 +94,7 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
       totalUnits,
       lowStock,
       outOfStock,
+      outOfStockItems,
       recentReceived,
       recentMovements,
     },
@@ -169,6 +200,7 @@ export const listStock = asyncHandler(async (req: Request, res: Response) => {
           id: true,
           name: true,
           sku: true,
+          partNumber: true,
           sellingPrice: true,
           minStockLevel: true,
           status: true,

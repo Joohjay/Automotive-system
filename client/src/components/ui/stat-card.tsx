@@ -9,12 +9,14 @@ export function StatCard({
   value,
   hint,
   tone = 'default',
+  pulse = false,
 }: {
   icon: LucideIcon
   label: string
   value: string
   hint?: string
   tone?: 'default' | 'success' | 'warning' | 'danger' | 'info'
+  pulse?: boolean
 }) {
   const toneClasses: Record<string, string> = {
     default: 'bg-zinc-500/10 text-zinc-600',
@@ -24,7 +26,7 @@ export function StatCard({
     info: 'bg-sky-500/10 text-sky-600',
   }
   return (
-    <Card>
+    <Card className={cn(pulse && 'ring-2 ring-red-500/40 animate-stock-warning')}>
       <CardContent className="flex items-center gap-4 p-5">
         <div
           className={cn(

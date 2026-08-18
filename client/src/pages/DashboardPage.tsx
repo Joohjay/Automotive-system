@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ArrowRight, Boxes, ClipboardList, Package, PackageSearch, PackageX, Receipt, Wallet, Wrench } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ArrowRight, Boxes, ClipboardList, Package, PackageSearch, PackageX, Receipt, Wallet, Wrench } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { useApiHealth } from '@/hooks/useApiHealth'
 import { useAuth } from '@/contexts/AuthContext'
 import { getInventorySummary } from '@/services/inventory.service'
+import { OutOfStockAlert } from '@/components/OutOfStockAlert'
 import type { InventorySummary } from '@/types/inventory'
 
 const upcomingModules = [
@@ -38,11 +39,15 @@ const upcomingModules = [
   },
 ]
 
+let oosAlertShownThisSession = false
+
 export function DashboardPage() {
   const health = useApiHealth()
   const { user, settings } = useAuth()
   const [summary, setSummary] = useState<InventorySummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [oosAlertOpen, setOosAlertOpen] = useState(false)
+  const alertTriggeredRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,6 +63,15 @@ export function DashboardPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (alertTriggeredRef.current) return
+    if (summary && summary.outOfStockItems.length > 0 && !oosAlertShownThisSession) {
+      alertTriggeredRef.current = true
+      oosAlertShownThisSession = true
+      setOosAlertOpen(true)
+    }
+  }, [summary])
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : 'Good afternoon'
 
@@ -90,7 +104,14 @@ export function DashboardPage() {
           <StatCard icon={PackageSearch} label="Low stock" value={loading ? '…' : String(summary?.lowStock ?? 0)} hint="Needs reordering" tone="warning" />
         </Link>
         <Link to="/inventory" className="block">
-          <StatCard icon={PackageX} label="Out of stock" value={loading ? '…' : String(summary?.outOfStock ?? 0)} hint="Urgent" tone="danger" />
+          <StatCard
+            icon={PackageX}
+            label="Out of stock"
+            value={loading ? '…' : String(summary?.outOfStock ?? 0)}
+            hint={summary && summary.outOfStock > 0 ? 'Urgent — attention required' : 'Urgent'}
+            tone="danger"
+            pulse={!loading && (summary?.outOfStock ?? 0) > 0}
+          />
         </Link>
       </div>
 
@@ -99,6 +120,47 @@ export function DashboardPage() {
           <Skeleton className="h-64 w-full" />
           <Skeleton className="h-64 w-full" />
         </div>
+      ) : null}
+
+      {!loading && summary && summary.outOfStockItems.length > 0 ? (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="size-5" />
+              Out-of-stock items
+            </CardTitle>
+            <CardDescription>
+              {summary.outOfStockItems.length} product{summary.outOfStockItems.length === 1 ? '' : 's'} completely out of stock.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {summary.outOfStockItems.map((item) => (
+                <div
+                  key={item.productId}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{item.name}</p>
+                    <p className="text-muted-foreground text-xs">
+                      SKU: {item.sku}
+                      {item.partNumber ? <> · Part #: {item.partNumber}</> : null}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      {item.locationCode} — {item.locationName}
+                    </p>
+                  </div>
+                  <Badge variant="destructive" className="shrink-0">0</Badge>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3">
+              <Link to="/inventory" className="text-sm font-medium text-red-600 hover:underline">
+                View all in inventory →
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       {!loading && summary && summary.recentMovements.length > 0 ? (
@@ -157,6 +219,12 @@ export function DashboardPage() {
           ))}
         </CardContent>
       </Card>
+
+      <OutOfStockAlert
+        open={oosAlertOpen}
+        onOpenChange={setOosAlertOpen}
+        items={summary?.outOfStockItems ?? []}
+      />
     </div>
   )
 }
