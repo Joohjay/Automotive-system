@@ -1,12 +1,15 @@
 import { z } from 'zod';
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{12,}$/;
+const PASSWORD_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, number, and special character';
+
 export const createUserSchema = z.object({
   email: z.string().email('Valid email is required'),
   fullName: z.string().min(1, 'Full name is required').max(200),
   phone: z.string().max(50).optional().nullable(),
   roleId: z.string().min(1, 'Role is required'),
   branchId: z.string().min(1, 'Branch is required'),
-  password: z.string().min(12, 'Password must be at least 12 characters'),
+  password: z.string().regex(PASSWORD_REGEX, PASSWORD_MESSAGE),
 });
 
 export const updateUserSchema = z.object({

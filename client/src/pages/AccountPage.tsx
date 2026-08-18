@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
 import { useAuth } from '@/contexts/AuthContext'
+import { PASSWORD_HINT, validatePassword } from '@/lib/password'
 import { changePassword } from '@/services/password.service'
 
 export function AccountPage() {
@@ -23,12 +24,13 @@ export function AccountPage() {
       toast.error('Please fill in all password fields')
       return
     }
-    if (newPassword.length < 12) {
-      toast.error('New password must be at least 12 characters')
-      return
-    }
     if (newPassword !== confirmPassword) {
       toast.error('Passwords do not match')
+      return
+    }
+    const pwError = validatePassword(newPassword)
+    if (pwError) {
+      toast.error(pwError)
       return
     }
     setSaving(true)
@@ -94,7 +96,7 @@ export function AccountPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">Minimum 12 characters</p>
+              <p className="text-muted-foreground text-xs">{PASSWORD_HINT}</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="confirmPw">Confirm New Password</Label>

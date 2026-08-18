@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PASSWORD_HINT, validatePassword } from '@/lib/password'
 import { resetPassword } from '@/services/password.service'
 
 export function ResetPasswordPage() {
@@ -25,8 +26,9 @@ export function ResetPasswordPage() {
       setError('Invalid or missing reset token.')
       return
     }
-    if (newPassword.length < 12) {
-      setError('Password must be at least 12 characters.')
+    const pwError = validatePassword(newPassword)
+    if (pwError) {
+      setError(pwError)
       return
     }
     if (newPassword !== confirmPassword) {
@@ -77,6 +79,7 @@ export function ResetPasswordPage() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                   />
+                  <p className="text-muted-foreground text-xs">{PASSWORD_HINT}</p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="confirmPw">Confirm Password</Label>

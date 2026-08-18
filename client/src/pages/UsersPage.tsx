@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/table'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDateTime } from '@/lib/format'
+import { PASSWORD_HINT, validatePassword } from '@/lib/password'
 import {
   adminResetPassword,
   activateUser,
@@ -147,9 +148,12 @@ export function UsersPage() {
       toast.error('Password is required for new users')
       return
     }
-    if (!editing && form.password.length < 12) {
-      toast.error('Password must be at least 12 characters')
-      return
+    if (!editing) {
+      const pwError = validatePassword(form.password)
+      if (pwError) {
+        toast.error(pwError)
+        return
+      }
     }
     setSaving(true)
     try {
@@ -408,6 +412,7 @@ export function UsersPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
+                <p className="text-muted-foreground text-xs">{PASSWORD_HINT}</p>
               </div>
             ) : null}
           </div>

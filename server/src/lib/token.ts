@@ -32,7 +32,7 @@ export function signAccessToken(user: {
 }
 
 export function verifyAccessToken(token: string): TokenPayload {
-  return jwt.verify(token, config.jwt.secret) as TokenPayload;
+  return jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] }) as TokenPayload;
 }
 
 export function toAuthUser(user: {

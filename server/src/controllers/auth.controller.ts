@@ -44,16 +44,31 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  const invalid = () =>
-    ApiError.unauthorized('Invalid email or password');
-
-  if (!user) throw invalid();
-
   const LOCKOUT_THRESHOLD = 5;
   const LOCKOUT_MINUTES = 15;
 
+  if (!user) {
+    await recordAudit({
+      action: 'FAILED_LOGIN',
+      entityType: 'User',
+      entityId: input.email.toLowerCase(),
+      ipAddress: clientIp(req),
+      userAgent: req.headers['user-agent'],
+    });
+    throw ApiError.unauthorized('Invalid email or password');
+  }
+
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     const remaining = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+    await recordAudit({
+      userId: user.id,
+      branchId: user.branchId,
+      action: 'FAILED_LOGIN',
+      entityType: 'User',
+      entityId: user.id,
+      ipAddress: clientIp(req),
+      userAgent: req.headers['user-agent'],
+    });
     throw ApiError.forbidden(`Account is locked. Try again in ${remaining} minute${remaining === 1 ? '' : 's'}.`);
   }
 
@@ -70,10 +85,19 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         ...(lockUntil ? { lockedUntil: lockUntil } : {}),
       },
     });
+    await recordAudit({
+      userId: user.id,
+      branchId: user.branchId,
+      action: 'FAILED_LOGIN',
+      entityType: 'User',
+      entityId: user.id,
+      ipAddress: clientIp(req),
+      userAgent: req.headers['user-agent'],
+    });
     if (lockUntil) {
       throw ApiError.forbidden(`Too many failed attempts. Account locked for ${LOCKOUT_MINUTES} minutes.`);
     }
-    throw invalid();
+    throw ApiError.unauthorized('Invalid email or password');
   }
 
   if (user.status !== 'ACTIVE') {
