@@ -346,7 +346,7 @@ export const adminResetPassword = asyncHandler(async (req: Request, res: Respons
   });
   if (!existing) throw ApiError.notFound('User not found');
 
-  const input = parseBody(adminResetPasswordSchema, req.body);
+  parseBody(adminResetPasswordSchema, req.body);
 
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');

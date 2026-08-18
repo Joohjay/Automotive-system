@@ -27,6 +27,4 @@ export const userListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const adminResetPasswordSchema = z.object({
-  newPassword: z.string().min(12, 'Password must be at least 12 characters'),
-});
+export const adminResetPasswordSchema = z.object({});

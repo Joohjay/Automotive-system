@@ -14,5 +14,4 @@ export const updateBranchSchema = z.object({
   address: z.string().max(500).optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   email: z.string().email().optional().nullable(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 });

@@ -53,11 +53,10 @@ export async function assignBranch(id: string, branchId: string): Promise<void> 
   await apiRequest(`/users/${id}/branch`, { method: 'PATCH', body: JSON.stringify({ branchId }) })
 }
 
-export async function adminResetPassword(id: string, newPassword: string): Promise<{ resetUrl?: string }> {
-  const res = await apiRequest<{ data: { resetUrl?: string } }>(`/users/${id}/password-reset`, {
-    method: 'POST', body: JSON.stringify({ newPassword }),
+export async function adminResetPassword(id: string): Promise<void> {
+  await apiRequest(`/users/${id}/password-reset`, {
+    method: 'POST', body: JSON.stringify({}),
   })
-  return res.data
 }
 
 export async function listRoles(): Promise<Role[]> {

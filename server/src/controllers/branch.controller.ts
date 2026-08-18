@@ -121,7 +121,6 @@ export const updateBranch = asyncHandler(async (req: Request, res: Response) => 
   if (input.address !== undefined) data.address = input.address;
   if (input.phone !== undefined) data.phone = input.phone;
   if (input.email !== undefined) data.email = input.email;
-  if (input.status !== undefined) data.status = input.status;
 
   if (input.code && input.code !== existing.code) {
     const duplicate = await prisma.branch.findUnique({ where: { code: input.code } });
@@ -183,9 +182,10 @@ export const deactivateBranch = asyncHandler(async (req: Request, res: Response)
   const activeUserCount = await prisma.user.count({
     where: { branchId: existing.id, status: 'ACTIVE' },
   });
-  if (activeUserCount > 0) {
-    console.warn(
-      `[branch] Deactivating branch "${existing.name}" (${existing.id}) with ${activeUserCount} active user(s)`,
+  const force = req.query.force === 'true';
+  if (activeUserCount > 0 && !force) {
+    throw ApiError.conflict(
+      `Cannot deactivate branch: ${activeUserCount} active user(s) assigned. Reassign or deactivate users first, or use ?force=true to proceed.`,
     );
   }
 

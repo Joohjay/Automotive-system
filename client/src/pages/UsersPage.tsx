@@ -85,7 +85,6 @@ export function UsersPage() {
 
   const [deactivating, setDeactivating] = useState<AdminUser | null>(null)
   const [resetUser, setResetUser] = useState<AdminUser | null>(null)
-  const [resetPassword, setResetPassword] = useState('')
   const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
@@ -148,6 +147,10 @@ export function UsersPage() {
       toast.error('Password is required for new users')
       return
     }
+    if (!editing && form.password.length < 12) {
+      toast.error('Password must be at least 12 characters')
+      return
+    }
     setSaving(true)
     try {
       if (editing) {
@@ -197,15 +200,14 @@ export function UsersPage() {
   }
 
   async function handleResetPassword() {
-    if (!resetUser || !resetPassword) return
+    if (!resetUser) return
     setResetting(true)
     try {
-      await adminResetPassword(resetUser.id, resetPassword)
-      toast.success('Password reset successfully')
+      await adminResetPassword(resetUser.id)
+      toast.success('Password reset link sent')
       setResetUser(null)
-      setResetPassword('')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to reset password')
+      toast.error(err instanceof Error ? err.message : 'Failed to send reset link')
     } finally {
       setResetting(false)
     }
@@ -441,27 +443,18 @@ export function UsersPage() {
       </Dialog>
 
       {/* Reset Password Dialog */}
-      <Dialog open={resetUser !== null} onOpenChange={(open) => { if (!open) { setResetUser(null); setResetPassword('') } }}>
+      <Dialog open={resetUser !== null} onOpenChange={(open) => { if (!open) { setResetUser(null) } }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
+            <DialogTitle>Send Password Reset</DialogTitle>
             <DialogDescription>
-              Set a new password for {resetUser?.fullName}.
+              A password reset link will be sent to {resetUser?.fullName}'s email address ({resetUser?.email}).
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2 py-2">
-            <Label htmlFor="resetPw">New Password</Label>
-            <Input
-              id="resetPw"
-              type="password"
-              value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
-            />
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setResetUser(null); setResetPassword('') }}>Cancel</Button>
-            <Button onClick={() => void handleResetPassword()} disabled={resetting || !resetPassword}>
-              {resetting ? 'Resetting…' : 'Reset Password'}
+            <Button variant="outline" onClick={() => { setResetUser(null) }}>Cancel</Button>
+            <Button onClick={() => void handleResetPassword()} disabled={resetting}>
+              {resetting ? 'Sending…' : 'Send Reset Link'}
             </Button>
           </DialogFooter>
         </DialogContent>
