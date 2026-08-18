@@ -10,6 +10,10 @@ import apiRouter from './routes/index.js';
 
 const app = express();
 
+if (config.isProduction) {
+  app.set('trust proxy', 1);
+}
+
 app.use(helmet({
   contentSecurityPolicy: config.isProduction ? undefined : false,
   crossOriginEmbedderPolicy: false,
