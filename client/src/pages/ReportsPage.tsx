@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { BarChart3, Package, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney, formatDate } from '@/lib/format'
+import { toastErrorMessage } from '@/lib/errors'
 import { getSalesReport, getInventoryReport, getExpenseReport } from '@/services/report.service'
 
 type Tab = 'sales' | 'inventory' | 'expenses'
@@ -63,9 +65,9 @@ export function ReportsPage() {
       if (salesFrom) params.from = salesFrom
       if (salesTo) params.to = salesTo
       const res = await getSalesReport(params)
-      setSalesData((res as any).data)
-    } catch {
-      toast.error('Failed to load sales report')
+      setSalesData(res)
+    } catch (err) {
+      toast.error(toastErrorMessage(err))
     } finally {
       setSalesLoading(false)
     }
@@ -75,9 +77,9 @@ export function ReportsPage() {
     try {
       setInventoryLoading(true)
       const res = await getInventoryReport()
-      setInventoryData((res as any).data)
-    } catch {
-      toast.error('Failed to load inventory report')
+      setInventoryData(res)
+    } catch (err) {
+      toast.error(toastErrorMessage(err))
     } finally {
       setInventoryLoading(false)
     }
@@ -90,9 +92,9 @@ export function ReportsPage() {
       if (expenseFrom) params.from = expenseFrom
       if (expenseTo) params.to = expenseTo
       const res = await getExpenseReport(params)
-      setExpenseData((res as any).data)
-    } catch {
-      toast.error('Failed to load expense report')
+      setExpenseData(res)
+    } catch (err) {
+      toast.error(toastErrorMessage(err))
     } finally {
       setExpenseLoading(false)
     }
@@ -147,6 +149,11 @@ export function ReportsPage() {
             </div>
           ) : salesData ? (
             <div className="space-y-6">
+              {salesData.period && (
+                <p className="text-xs text-muted-foreground">
+                  Period: {formatDate(salesData.period.from)} – {formatDate(salesData.period.to)}
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border bg-card p-4">
                   <p className="text-sm text-muted-foreground">Total Sales</p>
@@ -241,7 +248,10 @@ export function ReportsPage() {
               )}
             </div>
           ) : (
-            <SkeletonCards count={3} />
+            <EmptyState
+              title="No sales data"
+              description="Run the report to see sales totals, top products, and daily performance."
+            />
           )}
         </div>
       )}
@@ -266,11 +276,11 @@ export function ReportsPage() {
                 </div>
                 <div className="rounded-lg border bg-card p-4">
                   <p className="text-sm text-muted-foreground">Low Stock</p>
-                  <p className="text-2xl font-bold text-amber-600">{inventoryData.lowStock ?? 0}</p>
+                  <p className="text-2xl font-bold text-amber-600">{inventoryData.lowStockCount ?? 0}</p>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
                   <p className="text-sm text-muted-foreground">Out of Stock</p>
-                  <p className="text-2xl font-bold text-red-600">{inventoryData.outOfStock ?? 0}</p>
+                  <p className="text-2xl font-bold text-red-600">{inventoryData.outOfStockCount ?? 0}</p>
                 </div>
               </div>
 
@@ -301,7 +311,10 @@ export function ReportsPage() {
               )}
             </div>
           ) : (
-            <SkeletonCards count={4} />
+            <EmptyState
+              title="No inventory data"
+              description="Stock levels and category breakdowns will appear here."
+            />
           )}
         </div>
       )}
@@ -329,6 +342,11 @@ export function ReportsPage() {
             </div>
           ) : expenseData ? (
             <div className="space-y-6">
+              {expenseData.period && (
+                <p className="text-xs text-muted-foreground">
+                  Period: {formatDate(expenseData.period.from)} – {formatDate(expenseData.period.to)}
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border bg-card p-4">
                   <p className="text-sm text-muted-foreground">Total Expenses</p>
@@ -387,7 +405,10 @@ export function ReportsPage() {
               )}
             </div>
           ) : (
-            <SkeletonCards count={1} />
+            <EmptyState
+              title="No expense data"
+              description="Run the report to see expense totals and category breakdowns."
+            />
           )}
         </div>
       )}

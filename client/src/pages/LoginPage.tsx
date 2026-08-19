@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { CircleCheck, Eye, EyeOff, Loader2, Wrench } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,7 +38,7 @@ export function LoginPage() {
     }
   }
 
-  const businessName = settings?.businessName ?? 'Blax Enterprises'
+  const businessName = settings?.businessName ?? 'BennyBlax Enterprises'
 
   return (
     <div className="bg-muted/30 flex min-h-screen items-center justify-center px-4 py-10">
@@ -124,9 +124,9 @@ export function LoginPage() {
                   {isSubmitting ? 'Signing in…' : 'Sign in'}
                 </Button>
                 <div className="text-center text-sm">
-                  <a href="/forgot-password" className="text-primary hover:underline">
+                  <Link to="/forgot-password" className="text-primary hover:underline">
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
               </form>
             </CardContent>

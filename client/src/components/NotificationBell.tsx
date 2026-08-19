@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCheck, PackageX, PackageSearch, AlertTriangle, CreditCard, CircleAlert } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -46,7 +47,33 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
+function notificationTarget(n: Notification): { pathname: string; search?: string } {
+  switch (n.referenceType) {
+    case 'PRODUCT':
+      return n.referenceId
+        ? { pathname: '/inventory', search: `?product=${n.referenceId}` }
+        : { pathname: '/inventory' }
+    case 'PURCHASE':
+      return { pathname: '/receiving' }
+    case 'SALE':
+    case 'SALE_VOID':
+      return { pathname: '/sales' }
+    case 'RETURN':
+      return { pathname: '/returns' }
+    case 'ADJUSTMENT':
+      return { pathname: '/inventory' }
+    case 'LOAN_REMINDER':
+    case 'LOAN_OVERDUE':
+      return { pathname: '/loans' }
+    case 'CREDIT_WARNING':
+      return { pathname: '/customers' }
+    default:
+      return { pathname: '/' }
+  }
+}
+
 export function NotificationBell() {
+  const navigate = useNavigate()
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
@@ -139,6 +166,7 @@ export function NotificationBell() {
                 onSelect={(e) => {
                   e.preventDefault()
                   if (isUnread) void handleMarkRead(n.id)
+                  navigate(notificationTarget(n))
                 }}
               >
                 <Icon className={`mt-0.5 size-4 shrink-0 ${color}`} />

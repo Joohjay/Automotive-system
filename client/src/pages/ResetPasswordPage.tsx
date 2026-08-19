@@ -53,7 +53,7 @@ export function ResetPasswordPage() {
           <div className="bg-primary flex size-10 items-center justify-center rounded-lg text-primary-foreground">
             <Wrench className="size-5" />
           </div>
-          <span className="text-lg font-semibold">AutoParts</span>
+          <span className="text-lg font-semibold">BennyBlax Enterprises</span>
         </div>
         <Card>
           <CardHeader>

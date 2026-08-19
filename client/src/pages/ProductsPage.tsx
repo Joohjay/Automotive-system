@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { PackageSearch, Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -21,6 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StockBadge } from '@/components/stock/StockBadge'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney } from '@/lib/format'
+import { toastErrorMessage } from '@/lib/errors'
 import { listProducts, setProductStatus } from '@/services/product.service'
 import { listBrands, listCategories } from '@/services/referenceData.service'
 import type { Brand, Category, Product } from '@/types/product'
@@ -49,6 +60,8 @@ export function ProductsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
+  const [statusTarget, setStatusTarget] = useState<Product | null>(null)
+  const [statusBusy, setStatusBusy] = useState(false)
 
   const canCreate = hasPermission('product.create')
   const canUpdate = hasPermission('product.update')
@@ -95,23 +108,19 @@ export function ProductsPage() {
     setPage(1)
   }, [debouncedSearch, categoryId, brandId, status])
 
-  const stockValue = useMemo(
-    () =>
-      products.reduce(
-        (acc, p) => acc + Number(p.sellingPrice) * p.stock.quantityOnHand,
-        0,
-      ),
-    [products],
-  )
-
-  async function handleToggleStatus(p: Product) {
-    if (!canUpdate) return
+  async function confirmStatusChange() {
+    if (!statusTarget || statusBusy) return
+    const p = statusTarget
+    setStatusBusy(true)
     try {
       await setProductStatus(p.id, p.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')
       toast.success(p.status === 'ACTIVE' ? 'Product deactivated' : 'Product activated')
+      setStatusTarget(null)
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update status')
+      toast.error(toastErrorMessage(err))
+    } finally {
+      setStatusBusy(false)
     }
   }
 
@@ -258,7 +267,11 @@ export function ProductsPage() {
                         Stock
                       </Button>
                       {canUpdate ? (
-                        <Button variant="ghost" size="sm" onClick={() => void handleToggleStatus(p)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStatusTarget(p)}
+                        >
                           {p.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                         </Button>
                       ) : null}
@@ -271,10 +284,7 @@ export function ProductsPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-xs">
-          Stock value on hand: <span className="font-medium text-foreground">{formatMoney(stockValue, currency)}</span>
-        </p>
+      <div className="flex items-center justify-end">
         <Pagination page={page} pages={pages} onPageChange={setPage} />
       </div>
 
@@ -284,6 +294,47 @@ export function ProductsPage() {
         product={editing}
         onSaved={() => void load()}
       />
+
+      <AlertDialog
+        open={statusTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !statusBusy) setStatusTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {statusTarget?.status === 'ACTIVE' ? 'Disable product?' : 'Enable product?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusTarget?.status === 'ACTIVE' ? (
+                <>
+                  <strong>{statusTarget.name}</strong> will no longer appear in the catalogue or
+                  point of sale. Stock on hand is preserved and the product can be re-enabled later.
+                </>
+              ) : (
+                <>
+                  <strong>{statusTarget?.name}</strong> will become available again in the
+                  catalogue and point of sale.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={statusBusy}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmStatusChange()
+              }}
+            >
+              {statusTarget?.status === 'ACTIVE' ? 'Disable product' : 'Enable product'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

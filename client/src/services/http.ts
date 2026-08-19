@@ -1,6 +1,15 @@
 import { ensureCsrfToken, resetCsrfToken } from '@/lib/csrf'
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
+const rawApiUrl = import.meta.env.VITE_API_URL
+// Production builds must not fall back to a hard-coded localhost URL. When
+// VITE_API_URL is unset, assume the API is served from the same origin
+// (e.g. behind a reverse proxy). Dev keeps the local dev-server default.
+const API_URL =
+  rawApiUrl && rawApiUrl.trim() !== ''
+    ? rawApiUrl.replace(/\/+$/, '')
+    : import.meta.env.PROD
+      ? '/api'
+      : 'http://localhost:4000/api'
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 

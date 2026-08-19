@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Receipt } from 'lucide-react'
+import { Plus, Receipt, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
+import { Pagination } from '@/components/ui/pagination'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/contexts/AuthContext'
+import { toastErrorMessage } from '@/lib/errors'
 import { formatMoney, formatDate } from '@/lib/format'
 import { listExpenses, createExpense, listExpenseCategories, createExpenseCategory, getExpenseSummary } from '@/services/expense.service'
 import type { Expense, ExpenseCategory, ExpenseInput, ExpensePaymentMethod } from '@/types/expense'
@@ -25,11 +31,12 @@ const PAGE_SIZE = 15
 
 export function ExpensesPage() {
   const { settings } = useAuth()
-  const currency = settings?.currency || 'USD'
+  const currency = settings?.currency ?? 'TZS'
 
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [categories, setCategories] = useState<ExpenseCategory[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingSummary, setLoadingSummary] = useState(true)
   const [pagination, setPagination] = useState<{ page: number; pageSize: number; total: number; pages: number }>({
     page: 1,
     pageSize: PAGE_SIZE,
@@ -102,12 +109,13 @@ export function ExpensesPage() {
   }, [fetchExpenses])
 
   useEffect(() => {
+    setLoadingSummary(true)
     getExpenseSummary().then((s) => {
       setSummary({
         monthTotal: Number(s.monthTotal ?? 0),
         yearTotal: Number(s.yearTotal ?? 0),
       })
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setLoadingSummary(false))
   }, [])
 
   const handleCreateCategory = async () => {
@@ -120,8 +128,8 @@ export function ExpensesPage() {
       setNewCategoryName('')
       setShowNewCategory(false)
       toast.success('Category created')
-    } catch {
-      toast.error('Failed to create category')
+    } catch (err) {
+      toast.error(toastErrorMessage(err))
     } finally {
       setSavingCategory(false)
     }
@@ -158,8 +166,8 @@ export function ExpensesPage() {
       setDialogOpen(false)
       resetForm()
       fetchExpenses(pagination.page)
-    } catch {
-      toast.error('Failed to record expense')
+    } catch (err) {
+      toast.error(toastErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -187,17 +195,15 @@ export function ExpensesPage() {
         description="Track operational costs and expense categories."
         actions={
           <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Expense
+            <Plus /> Add Expense
           </Button>
         }
       />
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-lg border bg-card p-6">
           <p className="text-sm font-medium text-muted-foreground">Total This Month</p>
-          {loading ? (
+          {loadingSummary ? (
             <Skeleton className="mt-2 h-8 w-32" />
           ) : (
             <p className="mt-2 text-3xl font-bold">{formatMoney(summary.monthTotal, currency)}</p>
@@ -205,7 +211,7 @@ export function ExpensesPage() {
         </div>
         <div className="rounded-lg border bg-card p-6">
           <p className="text-sm font-medium text-muted-foreground">Total This Year</p>
-          {loading ? (
+          {loadingSummary ? (
             <Skeleton className="mt-2 h-8 w-32" />
           ) : (
             <p className="mt-2 text-3xl font-bold">{formatMoney(summary.yearTotal, currency)}</p>
@@ -213,54 +219,45 @@ export function ExpensesPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <label className="mb-1 block text-sm font-medium">Search</label>
+        <div className="relative min-w-52 flex-1">
+          <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
-            placeholder="Search expenses..."
+            className="pl-9"
+            placeholder="Search expenses…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
         </div>
         <div className="min-w-[160px]">
-          <label className="mb-1 block text-sm font-medium">Category</label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
+          <Label>Category</Label>
+          <Select value={categoryFilter || undefined} onValueChange={(v) => setCategoryFilter(v ?? '')}>
+            <SelectTrigger className="mt-1 w-full">
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="min-w-[160px]">
-          <label className="mb-1 block text-sm font-medium">From</label>
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
+          <Label>From</Label>
+          <Input className="mt-1" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </div>
         <div className="min-w-[160px]">
-          <label className="mb-1 block text-sm font-medium">To</label>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
+          <Label>To</Label>
+          <Input className="mt-1" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
         <Button variant="outline" onClick={handleSearch}>
           Filter
         </Button>
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -274,108 +271,82 @@ export function ExpensesPage() {
           description="Record your first expense to start tracking costs."
         />
       ) : (
-        <div className="rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Date</th>
-                  <th className="px-4 py-3 text-left font-medium">Description</th>
-                  <th className="px-4 py-3 text-left font-medium">Category</th>
-                  <th className="px-4 py-3 text-right font-medium">Amount</th>
-                  <th className="px-4 py-3 text-left font-medium">Payment Method</th>
-                  <th className="px-4 py-3 text-left font-medium">Created by</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((expense) => (
-                  <tr key={expense.id} className="border-b last:border-0 hover:bg-muted/25">
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(expense.expenseDate)}</td>
-                    <td className="px-4 py-3 max-w-[300px] truncate">{expense.description}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline">{expense.category?.name ?? '—'}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatMoney(expense.amount, currency)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="secondary">
-                        {expense.paymentMethod?.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {expense.createdBy?.fullName ?? '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Payment method</TableHead>
+                <TableHead>Created by</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenses.map((expense) => (
+                <TableRow key={expense.id}>
+                  <TableCell className="whitespace-nowrap">{formatDate(expense.expenseDate)}</TableCell>
+                  <TableCell className="max-w-72 truncate">{expense.description}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{expense.category?.name ?? '—'}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatMoney(expense.amount, currency)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">
+                      {expense.paymentMethod?.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {expense.createdBy?.fullName ?? '—'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 
-      {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.pages} ({pagination.total} expenses)
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => fetchExpenses(pagination.page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= pagination.pages}
-              onClick={() => fetchExpenses(pagination.page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+      <Pagination page={pagination.page} pages={pagination.pages} onPageChange={fetchExpenses} />
 
-      {/* Add Expense Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Expense</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Category */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Category *</label>
+              <Label>Category *</Label>
               {!showNewCategory ? (
-                <div className="flex gap-2">
-                  <select
-                    className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                  >
-                    <option value="">Select category...</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="mt-1 flex gap-2">
+                  <div className="flex-1">
+                    <Select value={formCategory || undefined} onValueChange={(v) => setFormCategory(v ?? '')}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select category…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    aria-label="Create a new category"
                     onClick={() => setShowNewCategory(true)}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus />
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="mt-1 space-y-2">
                   <Input
                     placeholder="New category name"
                     value={newCategoryName}
@@ -389,7 +360,7 @@ export function ExpensesPage() {
                       onClick={handleCreateCategory}
                       disabled={savingCategory || !newCategoryName.trim()}
                     >
-                      {savingCategory ? 'Saving...' : 'Save Category'}
+                      {savingCategory ? 'Saving…' : 'Save Category'}
                     </Button>
                     <Button
                       type="button"
@@ -407,20 +378,20 @@ export function ExpensesPage() {
               )}
             </div>
 
-            {/* Description */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Description *</label>
+              <Label>Description *</Label>
               <Input
+                className="mt-1"
                 placeholder="e.g. Office supplies purchase"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
               />
             </div>
 
-            {/* Amount */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Amount *</label>
+              <Label>Amount *</Label>
               <Input
+                className="mt-1"
                 type="number"
                 min="0"
                 step="0.01"
@@ -430,38 +401,37 @@ export function ExpensesPage() {
               />
             </div>
 
-            {/* Payment Method */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Payment Method</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={formPaymentMethod}
-                onChange={(e) => setFormPaymentMethod(e.target.value)}
-              >
-                {PAYMENT_METHODS.map((pm) => (
-                  <option key={pm.value} value={pm.value}>
-                    {pm.label}
-                  </option>
-                ))}
-              </select>
+              <Label>Payment Method</Label>
+              <Select value={formPaymentMethod} onValueChange={setFormPaymentMethod}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((pm) => (
+                    <SelectItem key={pm.value} value={pm.value}>
+                      {pm.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Reference */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Reference (optional)</label>
+              <Label>Reference (optional)</Label>
               <Input
+                className="mt-1"
                 placeholder="e.g. Receipt #12345"
                 value={formReference}
                 onChange={(e) => setFormReference(e.target.value)}
               />
             </div>
 
-            {/* Notes */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Notes (optional)</label>
-              <textarea
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                placeholder="Additional notes..."
+              <Label>Notes (optional)</Label>
+              <Textarea
+                className="mt-1"
+                placeholder="Additional notes…"
                 value={formNotes}
                 onChange={(e) => setFormNotes(e.target.value)}
               />
@@ -472,7 +442,7 @@ export function ExpensesPage() {
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Saving...' : 'Record Expense'}
+              {saving ? 'Saving…' : 'Record Expense'}
             </Button>
           </DialogFooter>
         </DialogContent>

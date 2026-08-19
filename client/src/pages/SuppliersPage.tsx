@@ -2,6 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { Building2, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -11,6 +21,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth } from '@/contexts/AuthContext'
+import { toastErrorMessage } from '@/lib/errors'
 import { listSuppliers, setSupplierStatus } from '@/services/supplier.service'
 import type { Supplier } from '@/types/supplier'
 import { SupplierFormDialog } from '@/components/suppliers/SupplierFormDialog'
@@ -31,6 +42,8 @@ export function SuppliersPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
+  const [statusTarget, setStatusTarget] = useState<Supplier | null>(null)
+  const [statusBusy, setStatusBusy] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -63,14 +76,19 @@ export function SuppliersPage() {
     setPage(1)
   }, [debouncedSearch])
 
-  async function handleToggleStatus(s: Supplier) {
-    if (!canManage) return
+  async function confirmStatusChange() {
+    if (!statusTarget || statusBusy) return
+    const s = statusTarget
+    setStatusBusy(true)
     try {
       await setSupplierStatus(s.id, s.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')
       toast.success(s.status === 'ACTIVE' ? 'Supplier deactivated' : 'Supplier activated')
+      setStatusTarget(null)
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update status')
+      toast.error(toastErrorMessage(err))
+    } finally {
+      setStatusBusy(false)
     }
   }
 
@@ -167,7 +185,7 @@ export function SuppliersPage() {
                         >
                           Edit
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => void handleToggleStatus(s)}>
+                        <Button variant="ghost" size="sm" onClick={() => setStatusTarget(s)}>
                           {s.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                         </Button>
                       </div>
@@ -188,6 +206,48 @@ export function SuppliersPage() {
         supplier={editing}
         onSaved={() => void load()}
       />
+
+      <AlertDialog
+        open={statusTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !statusBusy) setStatusTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {statusTarget?.status === 'ACTIVE' ? 'Disable supplier?' : 'Enable supplier?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusTarget?.status === 'ACTIVE' ? (
+                <>
+                  <strong>{statusTarget.name}</strong> will no longer be available for new purchase
+                  orders. Existing purchase history is preserved and the supplier can be re-enabled
+                  later.
+                </>
+              ) : (
+                <>
+                  <strong>{statusTarget?.name}</strong> will become available for purchase orders
+                  again.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={statusBusy}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmStatusChange()
+              }}
+            >
+              {statusTarget?.status === 'ACTIVE' ? 'Disable supplier' : 'Enable supplier'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

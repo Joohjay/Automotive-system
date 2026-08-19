@@ -17,6 +17,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
+import { toastErrorMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 import {
   createAdjustment,
@@ -115,7 +116,7 @@ function AdjustmentDialog({
       onDone()
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Adjustment failed.')
+      setError(toastErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -127,7 +128,9 @@ function AdjustmentDialog({
         <DialogHeader>
           <DialogTitle>Adjust stock</DialogTitle>
           <DialogDescription>
-            Set the actual quantity counted on the shelf. A ledger entry is created.
+            Set the actual quantity counted on the shelf. Setting a lower quantity permanently
+            removes the difference from available stock. A dated ledger entry is recorded for
+            audit.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -508,11 +511,7 @@ export function InventoryPage() {
         }}
         initialProductId={preSelectedProduct}
         onDone={() => {
-          void (async () => {
-            const [s, rows] = await Promise.all([getInventorySummary(), listStock()])
-            setSummary(s)
-            setStockRows(rows)
-          })()
+          void loadTransactions()
         }}
       />
     </div>

@@ -26,7 +26,7 @@ export function ReceiptDialog({
 }) {
   const { settings } = useAuth()
   const currency = settings?.currency ?? 'TZS'
-  const businessName = settings?.businessName ?? 'Blax Enterprises'
+  const businessName = settings?.businessName ?? 'BennyBlax Enterprises'
 
   useEffect(() => {
     if (!open) return

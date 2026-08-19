@@ -109,13 +109,11 @@ export function PosPage() {
     try {
       const detail = await getSale(sale.id)
       setReceipt(detail)
-      setCart([])
-      void loadProducts()
     } catch {
-      setReceipt({ ...sale, items: [], payments: [], returns: [] } as unknown as SaleDetail)
-      setCart([])
-      void loadProducts()
+      toast.error('Sale completed, but the receipt could not be loaded. It is available in Sales history.')
     }
+    setCart([])
+    void loadProducts()
   }
 
   return (
@@ -197,11 +195,11 @@ export function PosPage() {
           </div>
 
           {cart.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-              <ShoppingCart className="text-muted-foreground size-8" />
-              <p className="text-muted-foreground text-sm">The cart is empty.</p>
-              <p className="text-muted-foreground text-xs">Tap a product to add it.</p>
-            </div>
+            <EmptyState
+              icon={ShoppingCart}
+              title="The cart is empty"
+              description="Tap a product on the left to add it to the current sale."
+            />
           ) : (
             <>
               <div className="max-h-80 divide-y overflow-y-auto">
@@ -215,6 +213,7 @@ export function PosPage() {
                           type="button"
                           variant="outline"
                           size="icon"
+                          aria-label={`Decrease quantity of ${l.name}`}
                           onClick={() => setQty(l.productId, l.quantity - 1)}
                         >
                           <Minus />
@@ -224,6 +223,7 @@ export function PosPage() {
                           type="button"
                           variant="outline"
                           size="icon"
+                          aria-label={`Increase quantity of ${l.name}`}
                           onClick={() => setQty(l.productId, l.quantity + 1)}
                         >
                           <Plus />
@@ -255,6 +255,7 @@ export function PosPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Remove ${l.name} from cart`}
                       onClick={() => setCart((prev) => prev.filter((x) => x.productId !== l.productId))}
                     >
                       <Trash2 />

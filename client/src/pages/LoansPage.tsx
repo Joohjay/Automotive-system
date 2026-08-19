@@ -1,14 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, Eye, XCircle, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
+import { Pagination } from '@/components/ui/pagination'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/contexts/AuthContext'
+import { toastErrorMessage } from '@/lib/errors'
 import { formatMoney, formatDate } from '@/lib/format'
 import { listLoans, getLoan, createLoan, closeLoan, recordLoanPayment, getLoanSummary } from '@/services/loan.service'
 import type { Loan, LoanDetail, LoanSchedule, LoanInput, LoanPaymentInput } from '@/types/loan'
@@ -69,7 +85,7 @@ const PAGE_SIZE = 15
 
 export function LoansPage() {
   const { settings } = useAuth()
-  const currency = settings?.currency || 'USD'
+  const currency = settings?.currency ?? 'TZS'
 
   const [loans, setLoans] = useState<Loan[]>([])
   const [loading, setLoading] = useState(true)
@@ -120,6 +136,7 @@ export function LoansPage() {
   const [paymentReference, setPaymentReference] = useState('')
 
   // Close loan
+  const [closeTarget, setCloseTarget] = useState<Loan | LoanDetail | null>(null)
   const [closingLoanId, setClosingLoanId] = useState<string | null>(null)
 
   const fetchLoans = useCallback(async (page = 1) => {
@@ -275,18 +292,21 @@ export function LoansPage() {
     }
   }
 
-  const handleCloseLoan = async (loanId: string) => {
+  const confirmCloseLoan = async () => {
+    if (!closeTarget || closingLoanId) return
+    const loanId = closeTarget.id
     setClosingLoanId(loanId)
     try {
       await closeLoan(loanId)
       toast.success('Loan closed')
+      setCloseTarget(null)
       fetchLoans(pagination.page)
       if (detail && detail.id === loanId) {
         const updated = await getLoan(loanId)
         setDetail(updated)
       }
-    } catch {
-      toast.error('Failed to close loan')
+    } catch (err) {
+      toast.error(toastErrorMessage(err))
     } finally {
       setClosingLoanId(null)
     }
@@ -347,28 +367,28 @@ export function LoansPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <label className="mb-1 block text-sm font-medium">Search</label>
+        <div className="relative min-w-52 flex-1">
           <Input
-            placeholder="Search by lender or reference..."
+            placeholder="Search by lender or reference…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchLoans(1)}
           />
         </div>
         <div className="min-w-[140px]">
-          <label className="mb-1 block text-sm font-medium">Status</label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            {STATUS_FILTERS.map((sf) => (
-              <option key={sf.value} value={sf.value}>
-                {sf.label}
-              </option>
-            ))}
-          </select>
+          <Label>Status</Label>
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v ?? '')}>
+            <SelectTrigger className="mt-1 w-full">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTERS.map((sf) => (
+                <SelectItem key={sf.value} value={sf.value}>
+                  {sf.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button variant="outline" onClick={() => fetchLoans(1)}>
           Filter
@@ -389,94 +409,66 @@ export function LoansPage() {
           description="Add your first loan to start tracking borrowed funds."
         />
       ) : (
-        <div className="rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Lender</th>
-                  <th className="px-4 py-3 text-left font-medium">Reference</th>
-                  <th className="px-4 py-3 text-right font-medium">Principal</th>
-                  <th className="px-4 py-3 text-right font-medium">Interest Rate</th>
-                  <th className="px-4 py-3 text-right font-medium">Duration</th>
-                  <th className="px-4 py-3 text-center font-medium">Status</th>
-                  <th className="px-4 py-3 text-center font-medium">Payments</th>
-                  <th className="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loans.map((loan) => (
-                  <tr key={loan.id} className="border-b last:border-0 hover:bg-muted/25">
-                    <td className="px-4 py-3 font-medium">{loan.lender}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{loan.reference ?? '—'}</td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatMoney(loan.principalAmount, currency)}
-                    </td>
-                    <td className="px-4 py-3 text-right">{loan.interestRate}%</td>
-                    <td className="px-4 py-3 text-right">{loan.durationMonths} mo</td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge variant={statusBadgeVariant(loan.status)}>
-                        {loan.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-center">{loan._count?.payments ?? 0}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Lender</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead className="text-right">Principal</TableHead>
+                <TableHead className="text-right">Interest rate</TableHead>
+                <TableHead className="text-right">Duration</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Payments</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loans.map((loan) => (
+                <TableRow key={loan.id}>
+                  <TableCell className="font-medium">{loan.lender}</TableCell>
+                  <TableCell className="text-muted-foreground">{loan.reference ?? '—'}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatMoney(loan.principalAmount, currency)}
+                  </TableCell>
+                  <TableCell className="text-right">{loan.interestRate}%</TableCell>
+                  <TableCell className="text-right">{loan.durationMonths} mo</TableCell>
+                  <TableCell>
+                    <Badge variant={statusBadgeVariant(loan.status)}>
+                      {loan.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{loan._count?.payments ?? 0}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewDetail(loan.id)}
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        View
+                      </Button>
+                      {canCloseLoan(loan) && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleViewDetail(loan.id)}
+                          onClick={() => setCloseTarget(loan)}
                         >
-                          <Eye className="mr-1 h-4 w-4" />
-                          View
+                          <XCircle className="mr-1 h-4 w-4" />
+                          Close
                         </Button>
-                        {canCloseLoan(loan) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCloseLoan(loan.id)}
-                            disabled={closingLoanId === loan.id}
-                          >
-                            <XCircle className="mr-1 h-4 w-4" />
-                            Close
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 
-      {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.pages} ({pagination.total} loans)
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => fetchLoans(pagination.page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= pagination.pages}
-              onClick={() => fetchLoans(pagination.page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+      <Pagination page={pagination.page} pages={pagination.pages} onPageChange={fetchLoans} />
 
       {/* ============ CREATE LOAN DIALOG ============ */}
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetCreateForm() }}>
@@ -486,16 +478,18 @@ export function LoansPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Lender *</label>
+              <Label>Lender *</Label>
               <Input
+                className="mt-1"
                 placeholder="e.g. ABC Bank"
                 value={formLender}
                 onChange={(e) => setFormLender(e.target.value)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Reference</label>
+              <Label>Reference</Label>
               <Input
+                className="mt-1"
                 placeholder="e.g. Loan Agreement #001"
                 value={formReference}
                 onChange={(e) => setFormReference(e.target.value)}
@@ -503,8 +497,9 @@ export function LoansPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">Principal *</label>
+                <Label>Principal *</Label>
                 <Input
+                  className="mt-1"
                   type="number"
                   min="0"
                   step="0.01"
@@ -514,8 +509,9 @@ export function LoansPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Interest Rate (%) *</label>
+                <Label>Interest rate (%) *</Label>
                 <Input
+                  className="mt-1"
                   type="number"
                   min="0"
                   step="0.01"
@@ -527,22 +523,24 @@ export function LoansPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">Interest Method</label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={formInterestMethod}
-                  onChange={(e) => setFormInterestMethod(e.target.value)}
-                >
-                  {INTEREST_METHODS.map((im) => (
-                    <option key={im.value} value={im.value}>
-                      {im.label}
-                    </option>
-                  ))}
-                </select>
+                <Label>Interest method</Label>
+                <Select value={formInterestMethod} onValueChange={setFormInterestMethod}>
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INTEREST_METHODS.map((im) => (
+                      <SelectItem key={im.value} value={im.value}>
+                        {im.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Duration (months) *</label>
+                <Label>Duration (months) *</Label>
                 <Input
+                  className="mt-1"
                   type="number"
                   min="1"
                   step="1"
@@ -554,16 +552,18 @@ export function LoansPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">Start Date</label>
+                <Label>Start date</Label>
                 <Input
+                  className="mt-1"
                   type="date"
                   value={formStartDate}
                   onChange={(e) => setFormStartDate(e.target.value)}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Maturity Date</label>
+                <Label>Maturity date</Label>
                 <Input
+                  className="mt-1"
                   type="date"
                   value={formMaturityDate}
                   onChange={(e) => setFormMaturityDate(e.target.value)}
@@ -572,8 +572,9 @@ export function LoansPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">Expected Interest</label>
+                <Label>Expected interest</Label>
                 <Input
+                  className="mt-1"
                   type="number"
                   min="0"
                   step="0.01"
@@ -583,8 +584,9 @@ export function LoansPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Total Repayment</label>
+                <Label>Total repayment</Label>
                 <Input
+                  className="mt-1"
                   type="number"
                   min="0"
                   step="0.01"
@@ -595,10 +597,10 @@ export function LoansPage() {
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Notes</label>
-              <textarea
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                placeholder="Additional notes..."
+              <Label>Notes</Label>
+              <Textarea
+                className="mt-1"
+                placeholder="Additional notes…"
                 value={formNotes}
                 onChange={(e) => setFormNotes(e.target.value)}
               />
@@ -778,11 +780,11 @@ export function LoansPage() {
                 {canCloseLoan(detail) && (
                   <Button
                     variant="destructive"
-                    onClick={() => handleCloseLoan(detail.id)}
+                    onClick={() => setCloseTarget(detail)}
                     disabled={closingLoanId === detail.id}
                   >
                     <XCircle className="mr-2 h-4 w-4" />
-                    {closingLoanId === detail.id ? 'Closing...' : 'Close Loan'}
+                    {closingLoanId === detail.id ? 'Closing…' : 'Close Loan'}
                   </Button>
                 )}
               </div>
@@ -801,8 +803,9 @@ export function LoansPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Amount *</label>
+              <Label>Amount *</Label>
               <Input
+                className="mt-1"
                 type="number"
                 min="0"
                 step="0.01"
@@ -812,41 +815,44 @@ export function LoansPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Payment Method</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                {PAYMENT_METHODS.map((pm) => (
-                  <option key={pm.value} value={pm.value}>
-                    {pm.label}
-                  </option>
-                ))}
-              </select>
+              <Label>Payment method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((pm) => (
+                    <SelectItem key={pm.value} value={pm.value}>
+                      {pm.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {detail && detail.schedules && detail.schedules.length > 0 && (
               <div>
-                <label className="mb-1 block text-sm font-medium">Apply to Schedule (optional)</label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={paymentSchedule}
-                  onChange={(e) => setPaymentSchedule(e.target.value)}
-                >
-                  <option value="">General payment</option>
-                  {detail.schedules
-                    .filter((s: LoanSchedule) => s.status !== 'PAID')
-                    .map((s: LoanSchedule) => (
-                      <option key={s.id} value={s.id}>
-                        Installment #{s.installmentNo ?? '-'} — Due {formatDate(s.dueDate)} — {formatMoney(s.totalDue, currency)}
-                      </option>
-                    ))}
-                </select>
+                <Label>Apply to schedule (optional)</Label>
+                <Select value={paymentSchedule || undefined} onValueChange={(v) => setPaymentSchedule(v === '__general' ? '' : (v ?? ''))}>
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="General payment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__general">General payment</SelectItem>
+                    {detail.schedules
+                      .filter((s: LoanSchedule) => s.status !== 'PAID')
+                      .map((s: LoanSchedule) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          Installment #{s.installmentNo ?? '-'} — Due {formatDate(s.dueDate)} — {formatMoney(s.totalDue, currency)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div>
-              <label className="mb-1 block text-sm font-medium">Reference</label>
+              <Label>Reference</Label>
               <Input
+                className="mt-1"
                 placeholder="e.g. Receipt #"
                 value={paymentReference}
                 onChange={(e) => setPaymentReference(e.target.value)}
@@ -858,11 +864,43 @@ export function LoansPage() {
               Cancel
             </Button>
             <Button onClick={handleRecordPayment} disabled={paymentSaving}>
-              {paymentSaving ? 'Saving...' : 'Record Payment'}
+              {paymentSaving ? 'Saving…' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={closeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !closingLoanId) setCloseTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close loan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{closeTarget?.lender}</strong>
+              {closeTarget?.reference ? <> ({closeTarget.reference})</> : null} will be marked as
+              closed and can no longer receive payments. Outstanding installments remain recorded
+              for reference. This can be reviewed later but is a significant change.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep open</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={closingLoanId !== null}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmCloseLoan()
+              }}
+            >
+              {closingLoanId ? 'Closing…' : 'Close loan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

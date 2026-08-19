@@ -9,18 +9,56 @@ function toQuery(params: Record<string, string | undefined>): string {
   return s ? `?${s}` : ''
 }
 
-export async function getSalesReport(query: { from?: string; to?: string } = {}): Promise<unknown> {
-  return apiRequest<unknown>(`/reports/sales${toQuery(query)}`)
+export interface SalesReport {
+  period: { from: string; to: string }
+  totalSales: number
+  totalRevenue: string
+  totalDiscounts: string
+  byPaymentMethod: { method: string; count: number; total: string }[]
+  topProducts: { productId: string; name: string; quantity: number; revenue: string }[]
+  dailySales: { date: string; count: number; total: string }[]
 }
 
-export async function getInventoryReport(): Promise<unknown> {
-  return apiRequest<unknown>('/reports/inventory')
+export interface InventoryReport {
+  totalProducts: number
+  totalUnits: number
+  lowStockCount: number
+  outOfStockCount: number
+  byCategory: { categoryId: string; name: string; productCount: number; totalUnits: number }[]
 }
 
-export async function getExpenseReport(query: { from?: string; to?: string } = {}): Promise<unknown> {
-  return apiRequest<unknown>(`/reports/expenses${toQuery(query)}`)
+export interface ExpenseReport {
+  period: { from: string; to: string }
+  totalExpenses: string
+  byCategory: { categoryId: string; name: string; total: string }[]
+  byPaymentMethod: { method: string; count: number; total: string }[]
 }
 
-export async function getProfitLoss(query: { from?: string; to?: string } = {}): Promise<unknown> {
-  return apiRequest<unknown>(`/reports/pnl${toQuery(query)}`)
+export interface ProfitLossReport {
+  period: { from: string; to: string }
+  revenue: string
+  cogs: string
+  expenses: string
+  grossProfit: string
+  netProfit: string
+}
+
+export async function getSalesReport(query: { from?: string; to?: string } = {}): Promise<SalesReport> {
+  const res = await apiRequest<{ data: SalesReport }>(`/reports/sales${toQuery(query)}`)
+  return res.data
+}
+
+export async function getInventoryReport(): Promise<InventoryReport> {
+  const res = await apiRequest<{ data: InventoryReport }>('/reports/inventory')
+  return res.data
+}
+
+export async function getExpenseReport(query: { from?: string; to?: string } = {}): Promise<ExpenseReport> {
+  const res = await apiRequest<{ data: ExpenseReport }>(`/reports/expenses${toQuery(query)}`)
+  return res.data
+}
+
+export async function getProfitLoss(query: { from?: string; to?: string } = {}): Promise<ProfitLossReport> {
+  const res = await apiRequest<{ data: ProfitLossReport }>(`/reports/pnl${toQuery(query)}`)
+  return res.data
 }

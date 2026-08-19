@@ -53,9 +53,22 @@ const PERMISSIONS = [
   'shift.open',
   'shift.close',
   'user.manage',
+  'user.view',
+  'user.create',
+  'user.edit',
+  'branch.view',
+  'branch.create',
+  'branch.edit',
   'role.manage',
   'settings.manage',
 ] as const;
+
+// Codes reserved for administration (OWNER/ADMIN only). Never auto-granted to
+// non-admin roles even when they match the view/open/close suffix rule.
+const ADMIN_ONLY_PREFIXES = ['user.', 'branch.', 'role.', 'settings.'];
+
+const isAdminOnlyCode = (code: string) =>
+  ADMIN_ONLY_PREFIXES.some((prefix) => code.startsWith(prefix));
 
 async function main() {
   console.log('[seed] starting (development-only data)...');
@@ -100,11 +113,13 @@ async function main() {
   for (const [roleName, roleId] of roleMap) {
     const allowed = adminRoles.includes(roleName)
       ? permissionIds
-      : permissionIds.filter((_, i) =>
-          ['view', 'open', 'close', 'payment', 'receive', 'return'].some((s) =>
-            PERMISSIONS[i]?.endsWith(s),
-          ),
-        );
+      : permissionIds.filter((_, i) => {
+          const code = PERMISSIONS[i];
+          if (!code || isAdminOnlyCode(code)) return false;
+          return ['view', 'open', 'close', 'payment', 'receive', 'return'].some((s) =>
+            code.endsWith(s),
+          );
+        });
 
     for (const permissionId of allowed) {
       await prisma.rolePermission.upsert({

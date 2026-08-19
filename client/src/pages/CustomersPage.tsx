@@ -5,6 +5,16 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -18,6 +28,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth } from '@/contexts/AuthContext'
+import { toastErrorMessage } from '@/lib/errors'
 import { formatDate, formatMoney } from '@/lib/format'
 import { getCustomer, listCustomers, setCustomerStatus } from '@/services/customer.service'
 import type { Customer, CustomerDetail } from '@/types/customer'
@@ -46,7 +57,8 @@ export function CustomersPage() {
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [toggling, setToggling] = useState<string | null>(null)
+  const [statusTarget, setStatusTarget] = useState<Customer | null>(null)
+  const [statusBusy, setStatusBusy] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -92,17 +104,20 @@ export function CustomersPage() {
     }
   }
 
-  async function toggleStatus(customer: Customer) {
-    setToggling(customer.id)
+  async function confirmStatusChange() {
+    if (!statusTarget || statusBusy) return
+    const customer = statusTarget
+    setStatusBusy(true)
     try {
       const next = customer.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
       await setCustomerStatus(customer.id, next)
       toast.success(`Customer marked ${next.toLowerCase()}`)
+      setStatusTarget(null)
       void load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update status.')
+      toast.error(toastErrorMessage(err))
     } finally {
-      setToggling(null)
+      setStatusBusy(false)
     }
   }
 
@@ -165,7 +180,6 @@ export function CustomersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
-                <TableHead>Type</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead className="text-right">Credit balance</TableHead>
                 <TableHead>Status</TableHead>
@@ -186,7 +200,6 @@ export function CustomersPage() {
                         {c.customerType === 'WHOLESALE' ? 'Wholesale' : 'Retail'}
                       </span>
                     </TableCell>
-                    <TableCell>{c.customerType === 'WHOLESALE' ? 'Wholesale' : 'Retail'}</TableCell>
                     <TableCell>{c.phone ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       {c.creditEligible ? (
@@ -216,8 +229,7 @@ export function CustomersPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={toggling === c.id}
-                            onClick={() => void toggleStatus(c)}
+                            onClick={() => setStatusTarget(c)}
                           >
                             {c.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                           </Button>
@@ -249,6 +261,48 @@ export function CustomersPage() {
         }}
         onDone={() => void load()}
       />
+
+      <AlertDialog
+        open={statusTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !statusBusy) setStatusTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {statusTarget?.status === 'ACTIVE' ? 'Deactivate customer?' : 'Activate customer?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusTarget?.status === 'ACTIVE' ? (
+                <>
+                  <strong>{statusTarget.name}</strong> will no longer be selectable for new sales
+                  and will be blocked from purchasing on credit. Their outstanding balance and
+                  history are preserved, and they can be re-activated later.
+                </>
+              ) : (
+                <>
+                  <strong>{statusTarget?.name}</strong> will be selectable for sales and credit
+                  purchases again.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={statusBusy}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmStatusChange()
+              }}
+            >
+              {statusTarget?.status === 'ACTIVE' ? 'Deactivate customer' : 'Activate customer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
