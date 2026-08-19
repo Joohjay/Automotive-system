@@ -37,6 +37,34 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+const PLACEHOLDER_JWT = 'change-me-to-a-long-random-secret-at-least-32-chars';
+
+if (parsed.data.NODE_ENV === 'production') {
+  const problems: string[] = [];
+  if (parsed.data.EMAIL_PROVIDER !== 'smtp') {
+    problems.push('EMAIL_PROVIDER must be "smtp" in production (console mode is not allowed)');
+  }
+  if (!parsed.data.SMTP_HOST) {
+    problems.push('SMTP_HOST is required in production');
+  }
+  if (
+    parsed.data.JWT_SECRET === PLACEHOLDER_JWT ||
+    /^(change-me|changeme|secret|your-)/i.test(parsed.data.JWT_SECRET)
+  ) {
+    problems.push('JWT_SECRET must be a unique random value in production (generate with `openssl rand -hex 64`)');
+  }
+  if (!parsed.data.CLIENT_ORIGIN.startsWith('https://')) {
+    problems.push('CLIENT_ORIGIN must use https:// in production');
+  }
+  if (problems.length > 0) {
+    console.error(
+      'Invalid production environment configuration. Fix the following and restart:\n' +
+        problems.map((p) => `  - ${p}`).join('\n'),
+    );
+    process.exit(1);
+  }
+}
+
 export const config = {
   env: parsed.data.NODE_ENV,
   port: parsed.data.PORT,
