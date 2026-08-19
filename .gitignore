@@ -32,6 +32,15 @@ Thumbs.db
 server/.pgdata/
 server/prisma/*.db
 
+# Database backups (contain business data — never commit)
+backups/
+
+# Per-app deploy configs contain real hostnames/ports (non-secret) — commit
+# only the .example templates
+deploy/apps/*.env
+!deploy/apps/*.env.example
+deploy/rendered/
+
 # Misc
 .tmp/
 *.pem

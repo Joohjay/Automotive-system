@@ -2,6 +2,12 @@
 
 BennyBlax Enterprises — Automotive Spare Parts Management System
 
+> This VPS is designed to host MULTIPLE independent BennyBlax applications
+> (Automotive now, Motorcycle later). The full multi-application architecture,
+> including the Motorcycle example, is in **[MULTIAPP.md](MULTIAPP.md)**.
+> This guide documents the Automotive runbook; where single-app paths appear,
+> the multi-app equivalents are referenced.
+
 ---
 
 ## 1. Server Specifications
@@ -48,13 +54,13 @@ pg_config --version  # PostgreSQL 14+
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `JWT_SECRET` | Yes | Random secret, 32+ chars. Generate: `openssl rand -hex 64` |
 | `JWT_EXPIRES_IN` | No | Token lifetime (default: `8h`) |
-| `CLIENT_ORIGIN` | Yes | Frontend URL, e.g. `https://app.example.com` |
+| `CLIENT_ORIGIN` | Yes | Frontend URL, e.g. `https://auto.bennyblax.co.tz` |
 
 ### Frontend (client/.env.production — set at build time)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_API_URL` | Yes | Backend API URL, e.g. `https://api.example.com/api` |
+| `VITE_API_URL` | No | Leave EMPTY for the recommended same-origin setup (the app calls `/api` on the same hostname). Set only for the split-subdomain option (§18), e.g. `https://api.bennyblax.co.tz/api` |
 
 ---
 
@@ -62,31 +68,33 @@ pg_config --version  # PostgreSQL 14+
 
 ### 4.1 Create Production Database
 
+The database is created automatically by `deploy/setup-app.sh automotive`.
+Manual equivalent (dedicated user + database per application):
+
 ```bash
 sudo -u postgres psql
 ```
 
 ```sql
-CREATE USER autoparts WITH PASSWORD 'your-strong-password-here';
-CREATE DATABASE autoparts_prod OWNER autoparts;
-GRANT ALL PRIVILEGES ON DATABASE autoparts_prod TO autoparts;
+CREATE USER bennyblax_automotive WITH PASSWORD 'your-strong-password-here';
+CREATE DATABASE bennyblax_automotive OWNER bennyblax_automotive;
+GRANT ALL PRIVILEGES ON DATABASE bennyblax_automotive TO bennyblax_automotive;
 \q
 ```
 
 ### 4.2 Clone and Configure
 
 ```bash
-cd /var/www
-git clone https://github.com/Joohjay/Automotive-system.git autoparts
-cd autoparts
+cd /opt/bennyblax/apps
+git clone https://github.com/Joohjay/Automotive-system.git automotive
 
 # Backend environment
-cp server/.env.example server/.env
-# Edit server/.env with production values:
+cp automotive/server/.env.example automotive/server/.env
+# Edit automotive/server/.env with production values:
 #   NODE_ENV=production
-#   DATABASE_URL=postgresql://autoparts:your-strong-password@localhost:5432/autoparts_prod
+#   DATABASE_URL=postgresql://bennyblax_automotive:your-strong-password@localhost:5432/bennyblax_automotive
 #   JWT_SECRET=<generate with: openssl rand -hex 64>
-#   CLIENT_ORIGIN=https://app.example.com
+#   CLIENT_ORIGIN=https://auto.bennyblax.co.tz
 ```
 
 ### 4.3 Install Dependencies and Build
@@ -99,16 +107,16 @@ npx prisma generate
 npx prisma migrate deploy
 npm run build
 
-# Frontend
+# Frontend (same-origin: leave VITE_API_URL empty so the app calls /api)
 cd ../client
 npm ci
-VITE_API_URL=https://api.example.com/api npm run build
+npm run build
 ```
 
 ### 4.4 Start Production Server
 
 ```bash
-cd /var/www/autoparts/server
+cd /opt/bennyblax/apps/automotive/server
 NODE_ENV=production node dist/index.js
 ```
 
@@ -116,14 +124,16 @@ NODE_ENV=production node dist/index.js
 
 ## 5. Process Management (PM2)
 
+PM2 manages ONE independent process per application. The repository provides
+`deploy/ecosystem.config.cjs`, which reads every `deploy/apps/<app>.env` and
+registers a uniquely-named process per app (e.g. `bennyblax-automotive-api`).
+See [MULTIAPP.md](MULTIAPP.md) §5 for the multi-app design.
+
 ```bash
 npm install -g pm2
 
-cd /var/www/autoparts/server
-pm2 start dist/index.js --name autoparts-api \
-  --env production \
-  --max-memory-restart 512M \
-  --log-date-format "YYYY-MM-DD HH:mm:ss"
+cd /opt/bennyblax/apps/automotive   # or /opt/bennyblax/deploy
+pm2 start deploy/ecosystem.config.cjs
 
 pm2 save
 pm2 startup  # Follow the printed command to enable auto-restart on reboot
@@ -133,10 +143,10 @@ pm2 startup  # Follow the printed command to enable auto-restart on reboot
 
 ```bash
 pm2 list                  # List all processes
-pm2 logs autoparts-api    # View logs
-pm2 restart autoparts-api # Restart
-pm2 stop autoparts-api    # Stop
-pm2 delete autoparts-api  # Remove
+pm2 logs bennyblax-automotive-api  # View logs
+pm2 restart bennyblax-automotive-api # Restart one app only (others unaffected)
+pm2 stop bennyblax-automotive-api   # Stop one app only
+pm2 delete bennyblax-automotive-api # Remove one app only
 pm2 monit                 # Real-time monitoring
 ```
 
@@ -148,63 +158,30 @@ pm2 monit                 # Real-time monitoring
 sudo apt install -y nginx
 ```
 
-### /etc/nginx/sites-available/autoparts
+Nginx is the ONLY public entry point. Each application gets its own
+virtual-host configuration rendered from `deploy/templates/nginx-site.conf`
+(the recommended setup serves frontend AND `/api` from one hostname — no CORS;
+see [MULTIAPP.md](MULTIAPP.md) §3 and §18 for the split-subdomain option).
 
-```nginx
-# Frontend (static files)
-server {
-    listen 80;
-    server_name app.example.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name app.example.com;
-
-    ssl_certificate /etc/letsencrypt/live/app.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/app.example.com/privkey.pem;
-
-    # Security headers
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
-
-    # SPA: serve index.html for all routes
-    root /var/www/autoparts/client/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Cache static assets
-    location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-
-# Backend API
-server {
-    listen 443 ssl http2;
-    server_name api.example.com;
-
-    ssl_certificate /etc/letsencrypt/live/api.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
-
-    client_max_body_size 1m;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:4000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+### Generate and install the Automotive virtual host
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/autoparts /etc/nginx/sites-enabled/
+# Render-only preview (safe, no system changes):
+cd /opt/bennyblax/deploy
+./setup-app.sh automotive --render-only
+# inspect: deploy/rendered/automotive.conf
+
+# Full install (renders -> /etc/nginx/sites-available/automotive.conf,
+# symlinks into sites-enabled/, runs nginx -t, reloads):
+./setup-app.sh automotive
+```
+
+The rendered config includes: HTTP→HTTPS redirect, TLS, security headers,
+gzip, SPA routing, static-asset caching, and `location /api/ { proxy_pass
+http://127.0.0.1:<API_PORT>; }` with the standard proxy headers. Internal
+ports are never exposed publicly.
+
+```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -216,11 +193,8 @@ sudo systemctl reload nginx
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 
-# Frontend domain
-sudo certbot certonly --nginx -d app.example.com
-
-# API domain
-sudo certbot certonly --nginx -d api.example.com
+# Frontend hostname (single-hostname setup)
+sudo certbot certonly --nginx -d auto.bennyblax.co.tz
 
 # Auto-renewal (certbot installs a cron job automatically)
 sudo certbot renew --dry-run
@@ -239,36 +213,44 @@ sudo certbot renew --dry-run
 
 ## 9. Database Backup
 
+The backup script is application-aware (`./scripts/backup.sh <app-id>`,
+defaults to `automotive`). It writes app-scoped files to
+`backups/<app-id>/<app-id>_<timestamp>.sql.gz` and retains the last 30 backups
+**per application**. It reads `DATABASE_URL` from the app's env file or from
+the environment. See [MULTIAPP.md](MULTIAPP.md) §9.
+
 ### Automated Daily Backup (cron)
 
 ```bash
 # Edit crontab
 crontab -e
 
-# Add: daily backup at 2 AM
-0 2 * * * DATABASE_URL="postgresql://autoparts:password@localhost:5432/autoparts_prod" /var/www/autoparts/scripts/backup.sh >> /var/log/autoparts-backup.log 2>&1
+# Add: daily backup at 2 AM (Automotive app)
+0 2 * * * BACKUPS_ROOT=/opt/bennyblax/backups /opt/bennyblax/apps/automotive/scripts/backup.sh automotive >> /var/log/bennyblax/automotive/backup.log 2>&1
 ```
 
 ### Manual Backup
 
 ```bash
-DATABASE_URL="postgresql://autoparts:password@localhost:5432/autoparts_prod" \
-  ./scripts/backup.sh
+./scripts/backup.sh automotive
+# or with explicit connection:
+DATABASE_URL="postgresql://bennyblax_automotive:password@localhost:5432/bennyblax_automotive" \
+  ./scripts/backup.sh automotive
 ```
-
-Backups are stored in `./backups/` as compressed SQL files. The script retains the last 30 backups automatically.
 
 ### Restore
 
 ```bash
-# ALWAYS test on a separate database first!
-createdb -U autoparts autoparts_test
-DATABASE_URL="postgresql://autoparts:password@localhost:5432/autoparts_test" \
-  ./scripts/restore.sh backups/autoparts_20260818_020000.sql.gz
+# ALWAYS test on a separate database first! The test script restores into a
+# throwaway database, runs sanity checks, then drops it. It never touches
+# the production database, and it requires an EXPLICIT app identifier so a
+# backup can never land in another application's database.
+DATABASE_URL="postgresql://postgres@localhost:5432/postgres" \
+  ./scripts/restore-test.sh automotive backups/automotive/automotive_20260818_020000.sql.gz
 
 # Production restore (DANGEROUS — overwrites data)
-DATABASE_URL="postgresql://autoparts:password@localhost:5432/autoparts_prod" \
-  ./scripts/restore.sh backups/autoparts_20260818_020000.sql.gz
+DATABASE_URL="postgresql://bennyblax_automotive:password@localhost:5432/bennyblax_automotive" \
+  ./scripts/restore.sh backups/automotive/automotive_20260818_020000.sql.gz
 ```
 
 ### Off-site Backup
@@ -277,10 +259,10 @@ Copy backups to external storage regularly:
 
 ```bash
 # Example: copy to S3-compatible storage
-aws s3 sync ./backups/ s3://your-backup-bucket/autoparts/ --storage-class STANDARD_IA
+aws s3 sync ./backups/ s3://your-backup-bucket/bennyblax/ --storage-class STANDARD_IA
 
 # Or rsync to a remote server
-rsync -avz ./backups/ backup-user@remote-server:/backups/autoparts/
+rsync -avz ./backups/ backup-user@remote-server:/backups/bennyblax/
 ```
 
 ---
@@ -288,7 +270,7 @@ rsync -avz ./backups/ backup-user@remote-server:/backups/autoparts/
 ## 10. Database Migration Procedure
 
 ```bash
-cd /var/www/autoparts/server
+cd /opt/bennyblax/apps/automotive/server
 
 # Run pending migrations
 npx prisma migrate deploy
@@ -297,7 +279,7 @@ npx prisma migrate deploy
 npx prisma generate
 
 # Restart the server
-pm2 restart autoparts-api
+pm2 restart bennyblax-automotive-api
 ```
 
 **Important:** Never run `prisma migrate dev` or `prisma migrate reset` in production.
@@ -307,7 +289,7 @@ pm2 restart autoparts-api
 ## 11. Updating the Application
 
 ```bash
-cd /var/www/autoparts
+cd /opt/bennyblax/apps/automotive
 
 # Pull latest code
 git pull origin main
@@ -318,30 +300,31 @@ npm ci --omit=dev
 npx prisma generate
 npx prisma migrate deploy
 npm run build
-pm2 restart autoparts-api
+pm2 restart bennyblax-automotive-api
 
-# Frontend
+# Frontend (same-origin: leave VITE_API_URL empty so the app calls /api)
 cd ../client
 npm ci
-VITE_API_URL=https://api.example.com/api npm run build
+npm run build
 # Nginx serves the new dist/ automatically
 
 # Verify
-curl -s https://api.example.com/api/health
+curl -s https://auto.bennyblax.co.tz/api/health
 ```
 
 ---
 
 ## 12. Log Management
 
-PM2 logs are stored in `~/.pm2/logs/`. To prevent disk exhaustion:
+Application logs live per app in `/var/log/bennyblax/<app>/` (PM2 + Nginx).
+To prevent disk exhaustion:
 
 ```bash
 # Install logrotate
 sudo apt install -y logrotate
 
-# Create /etc/logrotate.d/autoparts
-/var/www/autoparts/logs/*.log {
+# Create /etc/logrotate.d/bennyblax (per-application log dirs)
+/var/log/bennyblax/*/*.log {
     daily
     rotate 14
     compress
@@ -367,7 +350,7 @@ pm2 set pm2-logrotate:compress true
 
 ```bash
 # Application + database status
-curl -s https://api.example.com/api/health | jq
+curl -s https://auto.bennyblax.co.tz/api/health | jq
 
 # Expected response:
 # {
@@ -381,41 +364,108 @@ curl -s https://api.example.com/api/health | jq
 
 ---
 
+## 13.5 Monitoring
+
+A lightweight, application-aware health/resource monitor is included:
+
+```bash
+# Monitor the Automotive app (defaults to its internal API on port 4000)
+./scripts/monitor.sh automotive
+
+# Monitor any other app (future) — no rewrite needed
+./scripts/monitor.sh motorcycle
+
+# Optional health URL override
+./scripts/monitor.sh automotive https://auto.bennyblax.co.tz/api/health
+```
+
+It checks: API health + database status, system load/memory/disk (fails if disk
+> 85%), TLS certificate expiry (fails if < 7 days; skipped while the hostname
+is a placeholder), and the app's PM2 process state.
+Exit code `1` means something failed.
+
+Recommended cron (every 5 minutes, per application):
+
+```bash
+*/5 * * * * /opt/bennyblax/apps/automotive/scripts/monitor.sh automotive >> /var/log/bennyblax/automotive/monitor.log 2>&1
+```
+
+Pair this with a basic host-level alert (e.g. `fail2ban` on SSH, `monit`, or
+your provider's uptime check against `https://auto.bennyblax.co.tz/api/health`).
+
+---
+
+## 13.6 Firewall
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'   # 80 + 443
+sudo ufw --force enable
+sudo ufw status
+```
+
+Only ports 22, 80, 443 should be open. The API (port 4000) must NOT be exposed
+publicly — Nginx proxies to it over localhost. If you need remote DB access,
+use an SSH tunnel instead of opening 5432.
+
+---
+
 ## 14. First-Time Production Setup
 
-After deploying to a fresh database:
+After deploying to a fresh production database, create the OWNER admin with
+the dedicated provisioning script. **Never run the dev seed
+(`prisma/seed.ts`) in production** — it refuses to run with `NODE_ENV=production`,
+and forcing it with `NODE_ENV=development` would create the development admin
+with the well-known development password (`Admin@12345`).
 
 ```bash
-# Run the seed script (creates admin, roles, permissions)
-cd /var/www/autoparts/server
-NODE_ENV=production npm run db:seed
+cd /opt/bennyblax/apps/automotive/server
+
+# With your own strong password (12+ chars, NOT the dev password):
+ADMIN_EMAIL=owner@yourdomain.com \
+ADMIN_FULL_NAME="Benny Blax" \
+ADMIN_PASSWORD="a-strong-unique-password-here" \
+npx tsx scripts/provision-admin.ts
+
+# OR let it generate a strong random password (printed exactly once):
+ADMIN_EMAIL=owner@yourdomain.com npx tsx scripts/provision-admin.ts
 ```
 
-**Important:** The seed script refuses to run in production by default. To run it once in production, temporarily set `NODE_ENV=development` in the seed script's environment, or use:
-
-```bash
-NODE_ENV=development npx tsx prisma/seed.ts
-```
-
-After seeding, immediately change the admin password via the UI. The default admin credentials are:
-- Email: `admin@autoparts.local`
-- Password: `Admin@12345`
+The script upserts the account with the `OWNER` role, assigns the first active
+branch, resets any lockout state, and never writes secrets to disk.
 
 ---
 
 ## 15. Emergency Rollback
 
-```bash
-# Rollback database (if a migration caused issues)
-# Check migration history
-npx prisma migrate status
+Decide rollback BEFORE deploying, and write down the previous good commit hash.
 
-# Restore from backup (see Section 9)
-# Rollback code
-git log --oneline -10  # Find the last good commit
-git checkout <commit-hash>
-# Rebuild and restart (see Section 11)
+### 15.1 Code rollback
+
+```bash
+cd /opt/bennyblax/apps/automotive
+git log --oneline -10          # find the last good commit
+git checkout <good-commit-hash>
+cd server && npm ci --omit=dev && npx prisma generate && npm run build
+pm2 restart bennyblax-automotive-api
+cd ../client && npm ci && npm run build
+# Nginx serves the previous dist/ immediately (or keep a copy of dist/ before deploying)
 ```
+
+### 15.2 Database rollback
+
+```bash
+# Check migration state
+cd /opt/bennyblax/apps/automotive/server && npx prisma migrate status
+
+# If a migration caused corruption/errors, restore the last GOOD backup:
+DATABASE_URL="postgresql://bennyblax_automotive:password@localhost:5432/bennyblax_automotive" \
+  /opt/bennyblax/apps/automotive/scripts/restore.sh backups/automotive/automotive_<last-good>.sql.gz
+```
+
+Rollback order: stop accepting new traffic (disable the `/api/` location or
+point DNS away), restore code, restore DB only if needed, then re-enable and
+verify with `/api/health` and a test login.
 
 ---
 
@@ -424,46 +474,100 @@ git checkout <commit-hash>
 ```
 Internet
    ↓
-DNS (A records for app.example.com, api.example.com)
+DNS (A record for auto.bennyblax.co.tz → server IP)
    ↓
-HTTPS (Let's Encrypt / Certbot)
+HTTPS (Let's Encrypt / Certbot, hostname-based)
    ↓
-Nginx (reverse proxy)
-   ├── app.example.com → /var/www/autoparts/client/dist (static SPA)
-   └── api.example.com → proxy_pass http://127.0.0.1:4000
-                              ↓
-                        Node.js (PM2)
-                        Express 5 + Prisma
-                              ↓
-                        PostgreSQL (autoparts_prod)
+Nginx (reverse proxy — ONLY public entry point)
+   ├── auto.bennyblax.co.tz → /opt/bennyblax/apps/automotive/client/dist (static SPA)
+   └── /api/                → proxy_pass http://127.0.0.1:4000
+                               ↓
+                         Node.js (PM2, bennyblax-automotive-api)
+                         Express 5 + Prisma
+                               ↓
+                         PostgreSQL (bennyblax_automotive)
 ```
+
+Future applications (e.g. Motorcycle) add their own hostname, Nginx vhost,
+PM2 process, port, database and certificate — see [MULTIAPP.md](MULTIAPP.md).
 
 ---
 
 ## 17. Quick Reference Commands
 
 ```bash
-# Start everything
-pm2 restart all
+# Start everything (registers one PM2 process per app in deploy/apps/*.env)
+pm2 start deploy/ecosystem.config.cjs
+pm2 save
+pm2 startup   # follow printed command
 
 # Check API health
 curl -s http://localhost:4000/api/health
 
 # View logs
-pm2 logs autoparts-api
+pm2 logs bennyblax-automotive-api
 
 # Database shell
-psql -U autoparts -d autoparts_prod
+psql -U bennyblax_automotive -d bennyblax_automotive
 
 # Run migrations
 cd server && npx prisma migrate deploy
 
-# Rebuild frontend
-cd client && VITE_API_URL=https://api.example.com/api npm run build
+# Rebuild frontend (same-origin option: VITE_API_URL left empty)
+cd client && npm run build
 
-# Backup
-DATABASE_URL="..." ./scripts/backup.sh
+# Provision the production admin
+cd server && ADMIN_EMAIL=owner@yourdomain.com npx tsx scripts/provision-admin.ts
 
-# Restore
-DATABASE_URL="..." ./scripts/restore.sh backups/<file>.sql.gz
+# Backup one app
+./scripts/backup.sh automotive
+
+# Test a backup restore (safe, throwaway DB)
+DATABASE_URL="postgresql://postgres@localhost:5432/postgres" ./scripts/restore-test.sh automotive backups/automotive/<file>.sql.gz
+
+# Restore (DANGEROUS)
+DATABASE_URL="..." ./scripts/restore.sh backups/automotive/<file>.sql.gz
+
+# Monitor one app
+./scripts/monitor.sh automotive
 ```
+
+---
+
+## 18. Alternative Architecture: Two Subdomains
+
+The simplest supported setup (recommended in Section 6) serves frontend and
+API from one hostname. The split setup (`app.` + `api.`) is also supported:
+
+- `CLIENT_ORIGIN=https://app.bennyblax.co.tz` (server .env)
+- `VITE_API_URL=https://api.bennyblax.co.tz/api` (client, set at build time)
+- Both A records → server IP; two Nginx server blocks; two certs.
+- Note: `sameSite=lax` cookies work across `app.`/`api.` because they are the
+  same registrable domain (same-site, cross-origin).
+
+Prefer the single-hostname option unless you have a reason to split.
+
+---
+
+## 19. Deployment Readiness Report
+
+Fill in the table below during/after the first production deployment.
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Domain purchased & DNS A record points at server | ☐ | |
+| VPS provisioned (specs per Section 1) | ☐ | |
+| Ubuntu + Node 22 + PostgreSQL installed | ☐ | |
+| Production DB created (bennyblax_automotive) | ☐ | |
+| server/.env set (production-validated on boot) | ☐ | |
+| `prisma migrate deploy` applied | ☐ | |
+| `npm run build` (server) succeeded | ☐ | |
+| Admin provisioned via `scripts/provision-admin.ts` | ☐ | |
+| SMTP verified (reset email sends) | ☐ | |
+| client build done (VITE_API_URL per Section 6/18) | ☐ | |
+| Nginx config live, `nginx -t` clean, HTTPS valid | ☐ | |
+| ufw firewall active (22, 80, 443 only) | ☐ | |
+| PM2 running, `pm2 save`, `pm2 startup` set | ☐ | |
+| Backup cron + restore-test passed | ☐ | |
+| Monitor cron running, health endpoint public | ☐ | |
+| rollback commit hash recorded | ☐ | |
