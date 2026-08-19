@@ -2,9 +2,15 @@ import type { Request, Response, NextFunction } from 'express';
 
 import prisma from '../lib/prisma.js';
 import { verifyAccessToken, toAuthUser } from '../lib/token.js';
+import { AUTH_COOKIE_NAME } from './csrf.js';
 import { ApiError } from './error.js';
 
 function extractToken(req: Request): string | null {
+  // httpOnly cookie is the primary transport for browser clients.
+  const cookieToken = (req.cookies as Record<string, string | undefined> | undefined)?.[AUTH_COOKIE_NAME];
+  if (cookieToken) return cookieToken;
+
+  // Bearer header fallback keeps API clients and test harnesses working.
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return null;
   return header.slice('Bearer '.length).trim() || null;

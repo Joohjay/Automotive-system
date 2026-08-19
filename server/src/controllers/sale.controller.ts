@@ -112,19 +112,29 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
     if (!byId.has(item.productId)) throw ApiError.badRequest('One or more products are unavailable');
   }
 
+  const inventoryRows = await prisma.inventory.findMany({
+    where: { branchId, productId: { in: productIds } },
+    select: { productId: true, avgCost: true },
+  });
+  const avgCostByProduct = new Map(inventoryRows.map((r) => [r.productId, r.avgCost]));
+
   const items = input.items.map((item) => {
     const product = byId.get(item.productId)!;
     const unitPrice = new Prisma.Decimal(item.unitPrice ?? product.sellingPrice);
     const quantity = item.quantity;
-    const discount = new Prisma.Decimal(0);
-    const lineTotal = unitPrice.mul(quantity);
+    const lineDiscount = new Prisma.Decimal(item.discount ?? 0);
+    const lineSubtotal = unitPrice.mul(quantity);
+    if (lineDiscount.greaterThan(lineSubtotal)) {
+      throw ApiError.badRequest('Line discount cannot exceed the line total');
+    }
+    const lineTotal = lineSubtotal.minus(lineDiscount);
     return {
       productId: item.productId,
       quantity,
       unitPrice,
-      discount,
+      discount: lineDiscount,
       lineTotal,
-      cost: product.purchasePrice,
+      cost: avgCostByProduct.get(item.productId) ?? product.purchasePrice,
       minStockLevel: product.minStockLevel,
     };
   });
@@ -133,6 +143,7 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
   const discount = new Prisma.Decimal(input.discount);
   if (discount.greaterThan(subtotal)) throw ApiError.badRequest('Discount cannot exceed the subtotal');
   const total = subtotal.minus(discount);
+  if (total.lessThan(0)) throw ApiError.badRequest('Sale total cannot be negative');
 
   const payments = input.payments.map((p) => ({
     method: p.method,
@@ -144,6 +155,14 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.badRequest('Payment does not cover the sale total');
   }
 
+  const nonCashPaid = payments
+    .filter((p) => p.method !== 'CASH')
+    .reduce((acc, p) => acc.plus(p.amount), new Prisma.Decimal(0));
+  const changeDue = paidTotal.minus(total);
+  if (changeDue.greaterThan(0) && nonCashPaid.greaterThan(total)) {
+    throw ApiError.badRequest('Overpayment is only allowed with cash; reduce the amount paid');
+  }
+
   const creditAmount = payments
     .filter((p) => p.method === 'CREDIT')
     .reduce((acc, p) => acc.plus(p.amount), new Prisma.Decimal(0));
@@ -153,7 +172,12 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
     if (!input.customerId) {
       throw ApiError.badRequest('A customer is required for credit payment');
     }
-    const customer = await prisma.customer.findUnique({ where: { id: input.customerId } });
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: input.customerId,
+        OR: [{ branchId }, { branchId: null }],
+      },
+    });
     if (!customer) throw ApiError.notFound('Customer not found');
     if (!customer.creditEligible) {
       throw ApiError.badRequest('This customer is not credit eligible');
@@ -179,7 +203,7 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const receiptNumber = await nextDocumentNumber(tx, branchId, 'RCP', 'sale');
+    const receiptNumber = await nextDocumentNumber(tx, branchId, 'RCP');
     const sale = await tx.sale.create({
       data: {
         branchId,
@@ -189,6 +213,7 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
         subtotal,
         discount,
         total,
+        changeDue,
         status: 'COMPLETED',
         notes: input.notes ?? null,
         saleDate: new Date(),
@@ -199,6 +224,7 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
             unitPrice: i.unitPrice,
             discount: i.discount,
             lineTotal: i.lineTotal,
+            cost: i.cost,
           })),
         },
         payments: { create: payments },
@@ -304,9 +330,10 @@ export const voidSale = asyncHandler(async (req: Request, res: Response) => {
     }
 
     await tx.payment.updateMany({ where: { saleId }, data: { status: 'REFUNDED' } });
+    const voidNote = input.reason ? `Voided: ${input.reason}` : 'Voided';
     return tx.sale.update({
       where: { id: saleId },
-      data: { status: 'VOID', notes: sale.notes ?? input.reason ?? 'Voided' },
+      data: { status: 'VOID', notes: sale.notes ? `${sale.notes}\n${voidNote}` : voidNote },
     });
   });
 

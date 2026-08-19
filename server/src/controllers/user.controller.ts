@@ -7,6 +7,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { config } from '../config/env.js';
 import { ApiError } from '../middleware/error.js';
+import { assertKeepsActiveAdmin } from '../services/admin-guard.service.js';
 import { recordAudit, scalarize } from '../services/audit.service.js';
 import { sendEmail } from '../services/email.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -116,6 +117,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       roleId: input.roleId,
       branchId: input.branchId,
       passwordHash,
+      mustChangePassword: true,
     },
     select: {
       id: true,
@@ -152,6 +154,15 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   if (!existing) throw ApiError.notFound('User not found');
 
   const input = parseBody(updateUserSchema, req.body);
+  if (existing.id === req.user!.id && input.status === 'INACTIVE') {
+    throw ApiError.conflict('You cannot deactivate your own account');
+  }
+  await assertKeepsActiveAdmin({
+    targetUserId: existing.id,
+    becomesInactive: input.status === 'INACTIVE',
+    ...(input.roleId !== undefined ? { newRoleId: input.roleId } : {}),
+  });
+
   const data: Prisma.UserUpdateInput = {};
   if (input.email !== undefined) data.email = input.email.toLowerCase();
   if (input.fullName !== undefined) data.fullName = input.fullName;
@@ -229,6 +240,10 @@ export const deactivateUser = asyncHandler(async (req: Request, res: Response) =
     where: { id: paramId(req, 'id') },
   });
   if (!existing) throw ApiError.notFound('User not found');
+  if (existing.id === req.user!.id) {
+    throw ApiError.conflict('You cannot deactivate your own account');
+  }
+  await assertKeepsActiveAdmin({ targetUserId: existing.id, becomesInactive: true });
 
   const user = await prisma.user.update({
     where: { id: existing.id },
@@ -270,6 +285,11 @@ export const assignRole = asyncHandler(async (req: Request, res: Response) => {
 
   const role = await prisma.role.findUnique({ where: { id: roleId } });
   if (!role) throw ApiError.notFound('Role not found');
+
+  await assertKeepsActiveAdmin({
+    targetUserId: existing.id,
+    newRoleId: roleId,
+  });
 
   const user = await prisma.user.update({
     where: { id: existing.id },

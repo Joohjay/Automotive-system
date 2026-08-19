@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import prisma from '../lib/prisma.js';
 import { ApiError } from '../middleware/error.js';
+import { assertBranchKeepsActiveAdmin } from '../services/admin-guard.service.js';
 import { recordAudit, scalarize } from '../services/audit.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { paramId, parseBody, parseQuery } from '../utils/validate.js';
@@ -188,6 +189,8 @@ export const deactivateBranch = asyncHandler(async (req: Request, res: Response)
       `Cannot deactivate branch: ${activeUserCount} active user(s) assigned. Reassign or deactivate users first, or use ?force=true to proceed.`,
     );
   }
+
+  await assertBranchKeepsActiveAdmin(existing.id);
 
   const branch = await prisma.branch.update({
     where: { id: existing.id },

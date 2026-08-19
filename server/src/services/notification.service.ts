@@ -81,14 +81,14 @@ export async function markNotificationRead(
   notificationId: string,
   userId: string,
 ): Promise<{ id: string; status: string } | null> {
-  return prisma.notification.updateMany({
+  const result = await prisma.notification.updateMany({
     where: { id: notificationId, userId },
     data: { status: 'READ', readAt: new Date() },
-  }).then(() => {
-    return prisma.notification.findUnique({
-      where: { id: notificationId },
-      select: { id: true, status: true },
-    });
+  });
+  if (result.count === 0) return null;
+  return prisma.notification.findFirst({
+    where: { id: notificationId, userId },
+    select: { id: true, status: true },
   });
 }
 

@@ -36,17 +36,16 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDateTime } from '@/lib/format'
 import { PASSWORD_HINT, validatePassword } from '@/lib/password'
-import { PASSWORD_HINT, validatePassword } from '@/lib/password'
 import {
   adminResetPassword,
   activateUser,
   createUser,
   deactivateUser,
-  listBranchesRef,
   listRoles,
   listUsers,
   updateUser,
 } from '@/services/user.service'
+import { listBranches } from '@/services/branch.service'
 import type { AdminBranch, AdminUser, Role } from '@/types/admin'
 
 const PAGE_SIZE = 10
@@ -119,7 +118,7 @@ export function UsersPage() {
 
   useEffect(() => {
     listRoles().then(setRoles).catch(() => {})
-    listBranchesRef().then(setBranches).catch(() => {})
+    listBranches().then(setBranches).catch(() => {})
   }, [])
 
   function openCreate() {

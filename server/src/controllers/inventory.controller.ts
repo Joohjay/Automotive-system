@@ -32,9 +32,8 @@ const stockQuerySchema = z.object({
 export const getSummary = asyncHandler(async (req: Request, res: Response) => {
   const branchId = req.user!.branchId;
 
-  const [totalProducts, inventoryRows, recentReceived, recentMovements] =
+  const [inventoryRows, recentReceived, recentMovements] =
     await Promise.all([
-      prisma.product.count({ where: { status: 'ACTIVE' } }),
       prisma.inventory.findMany({
         where: { branchId },
         include: {
@@ -54,15 +53,17 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
         where: { branchId, type: { in: ['PURCHASE', 'RETURN'] } },
         orderBy: { createdAt: 'desc' },
         take: 8,
-        include: { product: { select: { name: true, sku: true } }, location: { select: { name: true } } },
+        include: { product: { select: { name: true, sku: true } }, location: { select: { code: true, name: true } } },
       }),
       prisma.inventoryTransaction.findMany({
         where: { branchId },
         orderBy: { createdAt: 'desc' },
         take: 10,
-        include: { product: { select: { name: true, sku: true } }, location: { select: { name: true } } },
+        include: { product: { select: { name: true, sku: true } }, location: { select: { code: true, name: true } } },
       }),
     ]);
+
+  const totalProducts = new Set(inventoryRows.map((r) => r.productId)).size;
 
   let totalUnits = 0;
   let lowStock = 0;

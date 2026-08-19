@@ -16,6 +16,7 @@ import { useApiHealth } from '@/hooks/useApiHealth'
 import { useAuth } from '@/contexts/AuthContext'
 import { getInventorySummary } from '@/services/inventory.service'
 import { OutOfStockAlert } from '@/components/OutOfStockAlert'
+import { toast } from 'sonner'
 import type { InventorySummary } from '@/types/inventory'
 
 const upcomingModules = [
@@ -54,7 +55,7 @@ export function DashboardPage() {
     try {
       setSummary(await getInventorySummary())
     } catch {
-      // Silent: dashboard stays empty when API is unreachable.
+      toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }

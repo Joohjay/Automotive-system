@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import jwt from 'jsonwebtoken';
+import { Prisma } from '@prisma/client';
 
 export class ApiError extends Error {
   readonly statusCode: number;
@@ -55,6 +56,37 @@ function isPrismaError(err: unknown): boolean {
   return name.includes('Prisma');
 }
 
+function prismaErrorCode(err: unknown): string | null {
+  if (!isPrismaError(err)) return null;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+}
+
+// Maps Prisma error codes to stable HTTP responses so clients get accurate
+// status codes instead of a blanket 503. Internal details are never leaked.
+function prismaErrorResponse(
+  err: unknown,
+  fallback: { statusCode: number; code: string; message: string },
+): { statusCode: number; code: string; message: string } {
+  const code = prismaErrorCode(err);
+  switch (code) {
+    case 'P2000':
+      return { statusCode: 400, code: 'INVALID_VALUE', message: 'A provided value is too long for its field' };
+    case 'P2002':
+      return { statusCode: 409, code: 'CONFLICT', message: 'This record already exists' };
+    case 'P2003':
+      return { statusCode: 409, code: 'CONFLICT', message: 'This record is referenced by other data' };
+    case 'P2025':
+      return { statusCode: 404, code: 'NOT_FOUND', message: 'The requested record was not found' };
+    case 'P2014':
+      return { statusCode: 409, code: 'CONFLICT', message: 'This change would break related data' };
+    case 'P2024':
+      return fallback; // connection pool timeout -> treat as temporarily unavailable
+    default:
+      return fallback;
+  }
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -88,10 +120,20 @@ export function errorHandler(
     statusCode = 401;
     code = 'INVALID_TOKEN';
     message = 'Invalid authentication token';
+  } else if (err instanceof Prisma.PrismaClientValidationError) {
+    statusCode = 400;
+    code = 'INVALID_REQUEST';
+    message = 'Invalid request data';
+    console.error('[error] prisma validation:', (err as Error).message);
   } else if (isPrismaError(err)) {
-    statusCode = 503;
-    code = 'DATABASE_UNAVAILABLE';
-    message = 'The database is temporarily unavailable. Please try again in a moment.';
+    const mapped = prismaErrorResponse(err, {
+      statusCode: 503,
+      code: 'DATABASE_UNAVAILABLE',
+      message: 'The database is temporarily unavailable. Please try again in a moment.',
+    });
+    statusCode = mapped.statusCode;
+    code = mapped.code;
+    message = mapped.message;
     console.error('[error] database error:', (err as Error).message);
   }
 

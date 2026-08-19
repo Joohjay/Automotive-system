@@ -112,7 +112,36 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
 
   let product;
   try {
-    product = await prisma.product.create({ data });
+    product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({ data });
+
+      // Ensure the product is visible in the creator's branch inventory
+      // (zero on hand) so stock screens and low-stock alerts see it immediately.
+      const location = await tx.storageLocation.findFirst({
+        where: { branchId: req.user!.branchId, isActive: true },
+        orderBy: { code: 'asc' },
+      });
+      if (location) {
+        await tx.inventory.upsert({
+          where: {
+            branchId_productId_locationId: {
+              branchId: req.user!.branchId,
+              productId: created.id,
+              locationId: location.id,
+            },
+          },
+          update: {},
+          create: {
+            branchId: req.user!.branchId,
+            productId: created.id,
+            locationId: location.id,
+            quantityOnHand: 0,
+          },
+        });
+      }
+
+      return created;
+    });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw ApiError.conflict('A product with this SKU already exists');

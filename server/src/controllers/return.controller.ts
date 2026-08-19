@@ -167,12 +167,14 @@ export const createReturn = asyncHandler(async (req: Request, res: Response) => 
   let creditAccount: { id: string; outstandingBalance: Prisma.Decimal } | null = null;
   if (input.refundMethod === 'CREDIT') {
     if (!customerId) throw ApiError.badRequest('A customer is required for a credit refund');
-    creditAccount = await prisma.creditAccount.findUnique({ where: { customerId } });
+    creditAccount = await prisma.creditAccount.findFirst({
+      where: { customerId, branchId },
+    });
     if (!creditAccount) throw ApiError.badRequest('This customer has no credit account');
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const returnNumber = await nextDocumentNumber(tx, branchId, 'RET', 'return');
+    const returnNumber = await nextDocumentNumber(tx, branchId, 'RET');
     const ret = await tx.return.create({
       data: {
         branchId,

@@ -10,7 +10,7 @@ import {
 
 import { login as loginRequest, fetchMe, logout as logoutRequest } from '@/services/auth'
 import { UNAUTHORIZED_EVENT } from '@/services/http'
-import { getToken, setToken } from '@/lib/token'
+import { ensureCsrfToken } from '@/lib/csrf'
 import type { AppSettings, AuthUser } from '@/types/auth'
 
 interface AuthContextValue {
@@ -36,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   const clearSession = useCallback(() => {
-    setToken(null)
     setUser(null)
     setPermissions([])
     setSettings(null)
@@ -44,12 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const restoreSession = useCallback(async () => {
-    const token = getToken()
-    if (!token) {
-      setIsLoading(false)
-      return
-    }
     try {
+      // The JWT is carried in an httpOnly cookie; just ask the server who we are.
       const me = await fetchMe()
       setUser(me.user)
       setPermissions(me.permissions)
@@ -67,6 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [restoreSession])
 
   useEffect(() => {
+    void ensureCsrfToken()
+  }, [])
+
+  useEffect(() => {
     const handler = () => clearSession()
     window.addEventListener(UNAUTHORIZED_EVENT, handler)
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, handler)
@@ -74,7 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await loginRequest(email, password)
-    setToken(res.token)
     setUser(res.user)
     setPermissions(res.permissions)
     setSettings(res.settings)

@@ -181,6 +181,21 @@ export const receivePurchase = asyncHandler(async (req: Request, res: Response) 
   const results = await prisma.$transaction(async (tx) => {
     const resResults: { productId: string; quantityOnHand: number }[] = [];
     for (const { item, quantity } of receipts) {
+      // Atomic conditional claim: only succeeds while the outstanding quantity
+      // is available, so concurrent receive requests can never double-receive.
+      const claimed = await tx.purchaseItem.updateMany({
+        where: {
+          id: item.id,
+          receivedQty: { lte: item.quantity - quantity },
+        },
+        data: { receivedQty: { increment: quantity } },
+      });
+      if (claimed.count !== 1) {
+        throw ApiError.conflict(
+          'This purchase item was received concurrently. Please refresh and try again.',
+        );
+      }
+
       const stock = await applyStockChange(tx, {
         branchId: req.user!.branchId,
         productId: item.productId,
@@ -194,11 +209,6 @@ export const receivePurchase = asyncHandler(async (req: Request, res: Response) 
         note: `Received: ${purchase.reference} (${purchase.supplier.name})`,
       });
       resResults.push({ productId: item.productId, quantityOnHand: stock.quantityOnHand });
-
-      await tx.purchaseItem.update({
-        where: { id: item.id },
-        data: { receivedQty: { increment: quantity } },
-      });
     }
 
     const refreshed = await tx.purchaseItem.findMany({

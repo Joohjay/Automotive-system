@@ -5,6 +5,13 @@ import crypto from 'node:crypto';
 import prisma from '../lib/prisma.js';
 import { config } from '../config/env.js';
 import { signAccessToken, toAuthUser } from '../lib/token.js';
+import {
+  AUTH_COOKIE_MAX_AGE,
+  AUTH_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  csrfCookieOptions,
+  generateCsrfToken,
+} from '../middleware/csrf.js';
 import { ApiError } from '../middleware/error.js';
 import { recordAudit } from '../services/audit.service.js';
 import { sendEmail } from '../services/email.service.js';
@@ -18,9 +25,24 @@ import {
   resetPasswordSchema,
 } from '../validators/auth.validator.js';
 
+const BCRYPT_COST = 12;
+
+// Pre-computed hash so a failed login for an unknown email still runs a real
+// bcrypt comparison, keeping response timing consistent for account enumeration.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-equalizer-not-a-real-password', BCRYPT_COST);
+
 function clientIp(req: Request): string | undefined {
   return req.ip ?? req.headers['x-forwarded-for']?.toString();
 }
+
+export const getCsrfToken = asyncHandler(async (req: Request, res: Response) => {
+  let token = (req.cookies as Record<string, string | undefined>)[CSRF_COOKIE_NAME];
+  if (!token) {
+    token = generateCsrfToken();
+    res.cookie(CSRF_COOKIE_NAME, token, csrfCookieOptions());
+  }
+  res.json({ csrfToken: token });
+});
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const input = parseBody(loginSchema, req.body);
@@ -48,7 +70,15 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const LOCKOUT_THRESHOLD = 5;
   const LOCKOUT_MINUTES = 15;
 
+  const genericDenial = () => ApiError.unauthorized('Invalid email or password');
+
   if (!user) {
+    // Equalize DB round-trips with the valid-account path (which writes the
+    // failed-attempt counter) so request timing does not reveal account existence.
+    await prisma.user.updateMany({
+      where: { id: '000000000000000000000000000000' },
+      data: { failedLoginAttempts: { increment: 1 } },
+    });
     await recordAudit({
       action: 'FAILED_LOGIN',
       entityType: 'User',
@@ -56,11 +86,12 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       ipAddress: clientIp(req),
       userAgent: req.headers['user-agent'],
     });
-    throw ApiError.unauthorized('Invalid email or password');
+    // Dummy bcrypt compare equalizes password-verification timing.
+    await bcrypt.compare(input.password, DUMMY_PASSWORD_HASH);
+    throw genericDenial();
   }
 
   if (user.lockedUntil && user.lockedUntil > new Date()) {
-    const remaining = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
     await recordAudit({
       userId: user.id,
       branchId: user.branchId,
@@ -70,7 +101,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       ipAddress: clientIp(req),
       userAgent: req.headers['user-agent'],
     });
-    throw ApiError.forbidden(`Account is locked. Try again in ${remaining} minute${remaining === 1 ? '' : 's'}.`);
+    // Dummy bcrypt compare equalizes password-verification timing.
+    await bcrypt.compare(input.password, DUMMY_PASSWORD_HASH);
+    // Generic message: don't reveal that the account exists or its lock state.
+    throw genericDenial();
   }
 
   const valid = await bcrypt.compare(input.password, user.passwordHash);
@@ -95,10 +129,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       ipAddress: clientIp(req),
       userAgent: req.headers['user-agent'],
     });
-    if (lockUntil) {
-      throw ApiError.forbidden(`Too many failed attempts. Account locked for ${LOCKOUT_MINUTES} minutes.`);
-    }
-    throw ApiError.unauthorized('Invalid email or password');
+    throw genericDenial();
   }
 
   if (user.status !== 'ACTIVE') {
@@ -118,6 +149,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null },
+  });
+
+  // httpOnly cookie is the primary auth transport for the browser. The token is
+  // still returned in the body for API clients and backward compatibility.
+  res.cookie(AUTH_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: AUTH_COOKIE_MAX_AGE,
   });
 
   await recordAudit({
@@ -211,11 +252,10 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
       userAgent: req.headers['user-agent'],
     });
   }
-  // Stateless JWT: the client discards the token.
+  res.clearCookie(AUTH_COOKIE_NAME, { path: '/' });
+  // Stateless JWT: the client also discards its token.
   res.status(204).send();
 });
-
-const BCRYPT_COST = 12;
 
 export const changePassword = asyncHandler(async (req: Request, res: Response) => {
   const input = parseBody(changePasswordSchema, req.body);
@@ -232,7 +272,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   const newHash = await bcrypt.hash(input.newPassword, BCRYPT_COST);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: newHash },
+    data: { passwordHash: newHash, mustChangePassword: false },
   });
 
   await recordAudit({
@@ -333,7 +373,7 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: resetToken.userId },
-      data: { passwordHash: newHash },
+      data: { passwordHash: newHash, mustChangePassword: false },
     });
     await tx.passwordResetToken.update({
       where: { id: resetToken.id },

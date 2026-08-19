@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Bell, CheckCheck, PackageX, PackageSearch, AlertTriangle, CreditCard, CircleAlert } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDateTime } from '@/lib/format'
 import {
   listNotifications,
   markNotificationRead,

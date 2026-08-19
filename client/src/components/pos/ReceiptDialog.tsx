@@ -114,6 +114,12 @@ export function ReceiptDialog({
                 <span>{formatMoney(p.amount, currency)}</span>
               </div>
             ))}
+            {Number(sale.changeDue) > 0 ? (
+              <div className="flex justify-between font-medium">
+                <span>Change</span>
+                <span>{formatMoney(sale.changeDue, currency)}</span>
+              </div>
+            ) : null}
           </div>
 
           {sale.notes ? <p className="text-muted-foreground text-xs">{sale.notes}</p> : null}

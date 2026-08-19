@@ -183,6 +183,12 @@ export function SaleDetailDialog({
                     </span>
                   </div>
                 ))}
+                {Number(sale.changeDue) > 0 ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Change given</span>
+                    <span>{formatMoney(sale.changeDue, currency)}</span>
+                  </div>
+                ) : null}
               </div>
 
               {sale.returns.length > 0 ? (

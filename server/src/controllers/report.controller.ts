@@ -217,18 +217,10 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
   const { from, to } = parseQuery(periodQuerySchema, req.query);
   const range = dateRange(from, to);
 
-  const [revenue, cogsResult, expensesResult] = await Promise.all([
+  const [revenue, expensesResult] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { total: true },
       where: { branchId, status: 'COMPLETED', saleDate: range },
-    }),
-    prisma.inventoryTransaction.aggregate({
-      _sum: { quantity: true },
-      where: {
-        branchId,
-        type: 'SALE',
-        createdAt: range,
-      },
     }),
     prisma.expense.aggregate({
       _sum: { amount: true },
@@ -236,6 +228,8 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
     }),
   ]);
 
+  // COGS = sum of the frozen unit cost carried on each sale stock movement
+  // (weighted-average cost basis recorded at sale time).
   const saleTransactions = await prisma.inventoryTransaction.findMany({
     where: {
       branchId,

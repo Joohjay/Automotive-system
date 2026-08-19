@@ -60,9 +60,22 @@ export async function applyStockChange(
     );
   }
 
+  // Weighted-average cost maintenance: only a stock-in movement that carries a
+  // cost basis (purchase receiving) moves the average. Sales, returns,
+  // adjustments and voids never change the valuation basis.
+  let avgCost = inventory.avgCost;
+  if (input.quantity > 0 && input.unitCost && input.unitCost.greaterThan(0)) {
+    const totalCost = inventory.avgCost
+      .mul(inventory.quantityOnHand)
+      .plus(input.unitCost.mul(input.quantity));
+    avgCost = totalCost
+      .div(quantityOnHand)
+      .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  }
+
   await tx.inventory.update({
     where: { id: inventory.id },
-    data: { quantityOnHand },
+    data: { quantityOnHand, avgCost },
   });
 
   await tx.inventoryTransaction.create({

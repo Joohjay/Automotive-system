@@ -15,17 +15,25 @@ import {
 
 export const listCustomers = asyncHandler(async (req: Request, res: Response) => {
   const query = parseQuery(customerQuerySchema, req.query);
+  const branchId = req.user!.branchId;
 
   const where: Prisma.CustomerWhereInput = {
+    // Branch isolation: users only see customers belonging to their branch,
+    // plus shared (branchId null) customers.
+    AND: [
+      { OR: [{ branchId }, { branchId: null }] },
+      ...(query.search
+        ? [
+            {
+              OR: [
+                { name: { contains: query.search, mode: 'insensitive' as const } },
+                { phone: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            },
+          ]
+        : []),
+    ],
     ...(query.status ? { status: query.status } : {}),
-    ...(query.search
-      ? {
-          OR: [
-            { name: { contains: query.search, mode: 'insensitive' as const } },
-            { phone: { contains: query.search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
   };
 
   const [data, total] = await Promise.all([
@@ -55,8 +63,11 @@ export const listCustomers = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getCustomer = asyncHandler(async (req: Request, res: Response) => {
-  const customer = await prisma.customer.findUnique({
-    where: { id: paramId(req, 'id') },
+  const customer = await prisma.customer.findFirst({
+    where: {
+      id: paramId(req, 'id'),
+      OR: [{ branchId: req.user!.branchId }, { branchId: null }],
+    },
     include: {
       creditAccount: {
         include: {
@@ -68,6 +79,7 @@ export const getCustomer = asyncHandler(async (req: Request, res: Response) => {
         },
       },
       sales: {
+        where: { branchId: req.user!.branchId },
         orderBy: { saleDate: 'desc' },
         take: 10,
         select: { id: true, receiptNumber: true, total: true, status: true, saleDate: true },
@@ -123,7 +135,12 @@ export const createCustomer = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const updateCustomer = asyncHandler(async (req: Request, res: Response) => {
-  const existing = await prisma.customer.findUnique({ where: { id: paramId(req, 'id') } });
+  const existing = await prisma.customer.findFirst({
+    where: {
+      id: paramId(req, 'id'),
+      OR: [{ branchId: req.user!.branchId }, { branchId: null }],
+    },
+  });
   if (!existing) throw ApiError.notFound('Customer not found');
 
   const input = parseBody(updateCustomerSchema, req.body);
@@ -172,7 +189,12 @@ export const updateCustomer = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const setCustomerStatus = asyncHandler(async (req: Request, res: Response) => {
-  const existing = await prisma.customer.findUnique({ where: { id: paramId(req, 'id') } });
+  const existing = await prisma.customer.findFirst({
+    where: {
+      id: paramId(req, 'id'),
+      OR: [{ branchId: req.user!.branchId }, { branchId: null }],
+    },
+  });
   if (!existing) throw ApiError.notFound('Customer not found');
 
   const { status } = updateCustomerSchema.pick({ status: true }).parse(req.body);
@@ -195,8 +217,8 @@ export const createCreditPayment = asyncHandler(async (req: Request, res: Respon
   const input = parseBody(creditPaymentSchema, req.body);
   const customerId = paramId(req, 'id');
 
-  const account = await prisma.creditAccount.findUnique({
-    where: { customerId },
+  const account = await prisma.creditAccount.findFirst({
+    where: { customerId, branchId: req.user!.branchId },
     include: { customer: { select: { name: true } } },
   });
   if (!account) throw ApiError.badRequest('This customer has no credit account');

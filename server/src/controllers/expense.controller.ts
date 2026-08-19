@@ -62,7 +62,11 @@ export const createExpense = asyncHandler(async (req: Request, res: Response) =>
   const input = parseBody(createExpenseSchema, req.body);
 
   const category = await prisma.expenseCategory.findFirst({
-    where: { id: input.categoryId, isActive: true },
+    where: {
+      id: input.categoryId,
+      isActive: true,
+      OR: [{ branchId: null }, { branchId: req.user!.branchId }],
+    },
   });
   if (!category) throw ApiError.notFound('Expense category not found or inactive');
 

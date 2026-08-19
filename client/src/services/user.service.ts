@@ -63,8 +63,3 @@ export async function listRoles(): Promise<Role[]> {
   const res = await apiRequest<{ data: Role[] }>('/reference/roles')
   return res.data
 }
-
-export async function listBranchesRef(): Promise<{ id: string; name: string; code: string }[]> {
-  const res = await apiRequest<{ data: { id: string; name: string; code: string }[] }>('/reference/branches')
-  return res.data
-}

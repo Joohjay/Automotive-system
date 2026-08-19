@@ -12,6 +12,7 @@ export interface Sale {
   subtotal: string
   discount: string
   total: string
+  changeDue: string
   status: SaleStatus
   notes: string | null
   saleDate: string
@@ -59,6 +60,7 @@ export interface SaleItemInput {
   productId: string
   quantity: number
   unitPrice?: number
+  discount?: number
 }
 
 export interface SalePaymentInput {

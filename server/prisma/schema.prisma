@@ -185,6 +185,7 @@ model Branch {
   suppliers             Supplier[]
   customers             Customer[]
   expenseCategories     ExpenseCategory[]
+  documentCounters      DocumentCounter[]
 
   @@index([status])
   @@index([name])
@@ -359,6 +360,7 @@ model Inventory {
   productId      String
   locationId     String
   quantityOnHand Int      @default(0)
+  avgCost        Decimal  @default(0) @db.Decimal(12, 2) // weighted-average cost basis
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -542,6 +544,7 @@ model Sale {
   subtotal      Decimal    @db.Decimal(12, 2)
   discount      Decimal    @default(0) @db.Decimal(12, 2)
   total         Decimal    @db.Decimal(12, 2)
+  changeDue     Decimal    @default(0) @db.Decimal(12, 2) // cash overpayment returned as change
   status        SaleStatus @default(COMPLETED)
   notes         String?
   saleDate      DateTime   @default(now())
@@ -570,6 +573,7 @@ model SaleItem {
   unitPrice Decimal  @db.Decimal(12, 2) // historical, frozen at sale time
   discount  Decimal  @default(0) @db.Decimal(12, 2)
   lineTotal Decimal  @db.Decimal(12, 2)
+  cost      Decimal? @db.Decimal(12, 2) // historical cost basis for COGS
   createdAt DateTime @default(now())
 
   sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -872,6 +876,23 @@ model Setting {
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([branchId, key])
+}
+
+// Concurrency-safe per-branch per-day document sequence counters.
+// `value` is incremented atomically (INSERT ... ON CONFLICT DO UPDATE) inside the
+// same transaction that creates the document, so concurrent requests can never
+// receive the same number. Gaps are possible (rolled-back transactions burn a
+// sequence value) but duplicates are not.
+model DocumentCounter {
+  branchId  String
+  prefix    String // e.g. RCP (sale receipt) | RET (return)
+  day       String // YYYYMMDD
+  value     Int    @default(0)
+  updatedAt DateTime @updatedAt
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([branchId, prefix, day])
 }
 
 model PasswordResetToken {
