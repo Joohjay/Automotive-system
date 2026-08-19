@@ -217,12 +217,29 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
   const { from, to } = parseQuery(periodQuerySchema, req.query);
   const range = dateRange(from, to);
 
-  const [revenue, expensesResult] = await Promise.all([
+  const [revenue, expensesResult, dailyRevenue, dailyExpenses, byCategoryRaw] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { total: true },
       where: { branchId, status: 'COMPLETED', saleDate: range },
     }),
     prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { branchId, expenseDate: range },
+    }),
+    prisma.$queryRaw<{ date: Date; total: unknown }[]>`
+      SELECT date_trunc('day', "saleDate")::date AS date, COALESCE(SUM("total"), 0) AS total
+      FROM "Sale"
+      WHERE "branchId" = ${branchId} AND "status" = 'COMPLETED' AND "saleDate" >= ${range.gte} AND "saleDate" <= ${range.lte}
+      GROUP BY 1 ORDER BY 1
+    `,
+    prisma.$queryRaw<{ date: Date; total: unknown }[]>`
+      SELECT date_trunc('day', "expenseDate")::date AS date, COALESCE(SUM("amount"), 0) AS total
+      FROM "Expense"
+      WHERE "branchId" = ${branchId} AND "expenseDate" >= ${range.gte} AND "expenseDate" <= ${range.lte}
+      GROUP BY 1 ORDER BY 1
+    `,
+    prisma.expense.groupBy({
+      by: ['categoryId'],
       _sum: { amount: true },
       where: { branchId, expenseDate: range },
     }),
@@ -249,6 +266,38 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
   const rev = Number(revenue._sum.total ?? 0);
   const exp = Number(expensesResult._sum.amount ?? 0);
 
+  const revMap = new Map<string, number>(dailyRevenue.map((r) => [dayKey(r.date), Number(r.total)]));
+  const expMap = new Map<string, number>(dailyExpenses.map((r) => [dayKey(r.date), Number(r.total)]));
+
+  // Dense daily series (0-filled) capped at the most recent 45 days so the
+  // trend chart stays readable regardless of the selected period.
+  const start = new Date(range.gte);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(range.lte);
+  end.setHours(0, 0, 0, 0);
+  if (end.getTime() - start.getTime() > 44 * 86_400_000) start.setTime(end.getTime() - 44 * 86_400_000);
+
+  const daily: { date: string; revenue: string; expenses: string }[] = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().slice(0, 10);
+    daily.push({
+      date: key,
+      revenue: String(revMap.get(key) ?? 0),
+      expenses: String(expMap.get(key) ?? 0),
+    });
+  }
+
+  const categoryIds = byCategoryRaw.map((c) => c.categoryId).filter(Boolean) as string[];
+  const categories = categoryIds.length
+    ? await prisma.expenseCategory.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true } })
+    : [];
+  const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+  const byCategory = byCategoryRaw.map((c) => ({
+    categoryId: c.categoryId,
+    name: categoryMap.get(c.categoryId ?? '') ?? 'Unknown',
+    total: String(c._sum.amount ?? 0),
+  }));
+
   res.json({
     data: {
       period: { from: range.gte, to: range.lte },
@@ -257,6 +306,12 @@ export const profitLoss = asyncHandler(async (req: Request, res: Response) => {
       expenses: String(exp),
       grossProfit: String(rev - cogs),
       netProfit: String(rev - cogs - exp),
+      daily,
+      byCategory,
     },
   });
 });
+
+function dayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}

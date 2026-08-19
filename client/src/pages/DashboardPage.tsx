@@ -331,6 +331,52 @@ export function DashboardPage() {
         </Card>
       ) : null}
 
+      {!loading && canViewInventory && summary && summary.lowStockItems.length > 0 ? (
+        <Card className="border-amber-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-600">
+              <PackageSearch className="size-5" />
+              Low stock items
+            </CardTitle>
+            <CardDescription>
+              {summary.lowStockItems.length} product{summary.lowStockItems.length === 1 ? '' : 's'} at or below their minimum level.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {summary.lowStockItems.map((item) => (
+                <div
+                  key={item.productId}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{item.name}</p>
+                    <p className="text-muted-foreground text-xs">
+                      SKU: {item.sku}
+                      {item.partNumber ? <> · Part #: {item.partNumber}</> : null}
+                    </p>
+                    {item.brand ? (
+                      <p className="text-muted-foreground text-xs">Brand: {item.brand}</p>
+                    ) : null}
+                    <p className="text-muted-foreground text-xs">
+                      {item.locationCode} — {item.locationName}
+                    </p>
+                  </div>
+                  <Badge variant="warning" className="shrink-0">
+                    {item.quantityOnHand} / min {item.minStockLevel}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3">
+              <Link to="/inventory" className="text-sm font-medium text-amber-600 hover:underline">
+                View all in inventory →
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {!loading && canViewInventory && summary && summary.recentMovements.length > 0 ? (
         <Card>
           <CardHeader>

@@ -32,22 +32,22 @@ const stockQuerySchema = z.object({
 export const getSummary = asyncHandler(async (req: Request, res: Response) => {
   const branchId = req.user!.branchId;
 
-  const [inventoryRows, recentReceived, recentMovements] =
+  const [products, inventoryRows, recentReceived, recentMovements] =
     await Promise.all([
+      prisma.product.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          partNumber: true,
+          minStockLevel: true,
+          brand: { select: { name: true } },
+        },
+      }),
       prisma.inventory.findMany({
         where: { branchId },
-        include: {
-          product: {
-            select: {
-              minStockLevel: true,
-              name: true,
-              sku: true,
-              partNumber: true,
-              brand: { select: { name: true } },
-            },
-          },
-          location: { select: { code: true, name: true } },
-        },
+        include: { location: { select: { code: true, name: true } } },
       }),
       prisma.inventoryTransaction.findMany({
         where: { branchId, type: { in: ['PURCHASE', 'RETURN'] } },
@@ -63,7 +63,16 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
       }),
     ]);
 
-  const totalProducts = new Set(inventoryRows.map((r) => r.productId)).size;
+  const stockByProduct = new Map<string, { total: number; locationCode: string; locationName: string }>();
+  for (const inv of inventoryRows) {
+    const existing = stockByProduct.get(inv.productId) ?? {
+      total: 0,
+      locationCode: inv.location.code,
+      locationName: inv.location.name,
+    };
+    existing.total += inv.quantityOnHand;
+    stockByProduct.set(inv.productId, existing);
+  }
 
   let totalUnits = 0;
   let lowStock = 0;
@@ -78,31 +87,58 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
     locationCode: string;
     locationName: string;
   }> = [];
+  const lowStockItems: Array<{
+    productId: string;
+    name: string;
+    sku: string;
+    partNumber: string | null;
+    brand: string | null;
+    quantityOnHand: number;
+    minStockLevel: number;
+    locationCode: string;
+    locationName: string;
+  }> = [];
 
-  for (const inv of inventoryRows) {
-    totalUnits += inv.quantityOnHand;
-    if (inv.quantityOnHand <= 0) {
+  for (const product of products) {
+    const stock = stockByProduct.get(product.id);
+    const total = stock?.total ?? 0;
+    totalUnits += total;
+    if (total <= 0) {
       outOfStock += 1;
       outOfStockItems.push({
-        productId: inv.productId,
-        name: inv.product.name,
-        sku: inv.product.sku,
-        partNumber: inv.product.partNumber ?? null,
-        brand: inv.product.brand?.name ?? null,
-        quantityOnHand: inv.quantityOnHand,
-        locationCode: inv.location.code,
-        locationName: inv.location.name,
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        partNumber: product.partNumber ?? null,
+        brand: product.brand?.name ?? null,
+        quantityOnHand: total,
+        locationCode: stock?.locationCode ?? '',
+        locationName: stock?.locationName ?? '',
       });
-    } else if (inv.quantityOnHand <= inv.product.minStockLevel) lowStock += 1;
+    } else if (total <= product.minStockLevel) {
+      lowStock += 1;
+      lowStockItems.push({
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        partNumber: product.partNumber ?? null,
+        brand: product.brand?.name ?? null,
+        quantityOnHand: total,
+        minStockLevel: product.minStockLevel,
+        locationCode: stock?.locationCode ?? '',
+        locationName: stock?.locationName ?? '',
+      });
+    }
   }
 
   res.json({
     data: {
-      totalProducts,
+      totalProducts: products.length,
       totalUnits,
       lowStock,
       outOfStock,
       outOfStockItems,
+      lowStockItems,
       recentReceived,
       recentMovements,
     },

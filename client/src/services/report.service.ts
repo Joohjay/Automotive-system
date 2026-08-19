@@ -41,6 +41,8 @@ export interface ProfitLossReport {
   expenses: string
   grossProfit: string
   netProfit: string
+  daily: { date: string; revenue: string; expenses: string }[]
+  byCategory: { categoryId: string; name: string; total: string }[]
 }
 
 export async function getSalesReport(query: { from?: string; to?: string } = {}): Promise<SalesReport> {

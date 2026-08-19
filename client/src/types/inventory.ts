@@ -29,12 +29,25 @@ export interface OutOfStockItem {
   locationName: string
 }
 
+export interface LowStockItem {
+  productId: string
+  name: string
+  sku: string
+  partNumber: string | null
+  brand: string | null
+  quantityOnHand: number
+  minStockLevel: number
+  locationCode: string
+  locationName: string
+}
+
 export interface InventorySummary {
   totalProducts: number
   totalUnits: number
   lowStock: number
   outOfStock: number
   outOfStockItems: OutOfStockItem[]
+  lowStockItems: LowStockItem[]
   recentReceived: InventoryTransaction[]
   recentMovements: InventoryTransaction[]
 }

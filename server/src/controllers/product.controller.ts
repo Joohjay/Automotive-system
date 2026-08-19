@@ -14,9 +14,10 @@ import {
 } from '../validators/product.validator.js';
 
 function stockOf(product: { inventory: { quantityOnHand: number; location?: { code: string; name: string } | null }[] }) {
+  const total = product.inventory.reduce((sum, row) => sum + row.quantityOnHand, 0);
   const row = product.inventory[0];
   return {
-    quantityOnHand: row?.quantityOnHand ?? 0,
+    quantityOnHand: total,
     locationCode: row?.location?.code ?? null,
     locationName: row?.location?.name ?? null,
   };
@@ -54,7 +55,6 @@ export const listProducts = asyncHandler(async (req: Request, res: Response) => 
         inventory: {
           where: { branchId: req.user!.branchId },
           select: { quantityOnHand: true, location: { select: { code: true, name: true } } },
-          take: 1,
         },
       },
       orderBy: { name: 'asc' },

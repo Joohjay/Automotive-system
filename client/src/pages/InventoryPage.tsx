@@ -74,14 +74,18 @@ function AdjustmentDialog({
     setNewQuantity('')
     setReason('')
     void (async () => {
-      const [prods, locs] = await Promise.all([
-        listProducts({ status: 'ACTIVE', pageSize: 200 }),
-        listLocations(),
-      ])
-      setProducts(prods.data)
-      setLocations(locs)
-      setProductId(initialProductId && prods.data.some((p) => p.id === initialProductId) ? initialProductId : '')
-      setLocationId(locs[0]?.id ?? '')
+      try {
+        const [prods, locs] = await Promise.all([
+          listProducts({ status: 'ACTIVE', pageSize: 100 }),
+          listLocations(),
+        ])
+        setProducts(prods.data)
+        setLocations(locs)
+        setProductId(initialProductId && prods.data.some((p) => p.id === initialProductId) ? initialProductId : '')
+        setLocationId(locs[0]?.id ?? '')
+      } catch (err) {
+        setError(toastErrorMessage(err))
+      }
     })()
   }, [open, initialProductId])
 

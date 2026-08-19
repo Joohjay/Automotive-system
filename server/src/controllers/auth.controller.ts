@@ -15,6 +15,7 @@ import {
 import { ApiError } from '../middleware/error.js';
 import { recordAudit } from '../services/audit.service.js';
 import { sendEmail } from '../services/email.service.js';
+import { reconcileStockNotifications } from '../services/notification.service.js';
 import { getSettings } from '../services/settings.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { parseBody } from '../utils/validate.js';
@@ -174,6 +175,12 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const settings = await getSettings(user.branchId);
 
   const permissions = user.role.permissions.map((rp) => rp.permission.code);
+
+  if (user.branchId) {
+    void reconcileStockNotifications(user.branchId).catch(() => {
+      // Non-critical: the notification bell degrades gracefully.
+    });
+  }
 
   res.json({
     token,
