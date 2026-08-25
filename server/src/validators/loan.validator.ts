@@ -6,6 +6,7 @@ const money = z.coerce.number();
 export const createLoanSchema = z.object({
   lender: z.string().trim().min(1, 'Lender is required').max(200),
   reference: z.string().trim().max(200).nullable().optional(),
+  customerId: id.nullable().optional(),
   principalAmount: money.refine((v) => v > 0, 'Principal must be greater than zero'),
   interestRate: money.default(0),
   interestMethod: z.enum(['FLAT', 'REDUCING_BALANCE', 'FIXED_SCHEDULE']).default('FLAT'),
@@ -20,6 +21,7 @@ export const createLoanSchema = z.object({
 export const updateLoanSchema = z.object({
   lender: z.string().trim().min(1).max(200).optional(),
   reference: z.string().trim().max(200).nullable().optional(),
+  customerId: id.nullable().optional(),
   interestRate: money.optional(),
   interestMethod: z.enum(['FLAT', 'REDUCING_BALANCE', 'FIXED_SCHEDULE']).optional(),
   durationMonths: z.coerce.number().int().min(0).optional(),

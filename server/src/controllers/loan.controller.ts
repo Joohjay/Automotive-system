@@ -33,6 +33,7 @@ export const listLoans = asyncHandler(async (req: Request, res: Response) => {
           OR: [
             { lender: { contains: query.search, mode: 'insensitive' as const } },
             { reference: { contains: query.search, mode: 'insensitive' as const } },
+            { customer: { name: { contains: query.search, mode: 'insensitive' as const } } },
           ],
         }
       : {}),
@@ -43,6 +44,7 @@ export const listLoans = asyncHandler(async (req: Request, res: Response) => {
       where,
       include: {
         createdBy: { select: { id: true, fullName: true } },
+        customer: { select: { id: true, name: true } },
         _count: { select: { payments: true, schedules: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -68,6 +70,7 @@ export const getLoan = asyncHandler(async (req: Request, res: Response) => {
     where: { id: paramId(req, 'id'), branchId: req.user!.branchId },
     include: {
       createdBy: { select: { id: true, fullName: true } },
+      customer: { select: { id: true, name: true, phone: true } },
       schedules: { orderBy: { installmentNo: 'asc' } },
       payments: { orderBy: { paymentDate: 'desc' } },
     },
@@ -101,6 +104,7 @@ export const createLoan = asyncHandler(async (req: Request, res: Response) => {
     data: {
       lender: input.lender,
       reference: input.reference ?? null,
+      customerId: input.customerId ?? null,
       branchId,
       principalAmount: principal,
       interestRate: rate,
@@ -138,6 +142,11 @@ export const updateLoan = asyncHandler(async (req: Request, res: Response) => {
   const data: Prisma.LoanUpdateInput = {};
   if (input.lender !== undefined) data.lender = input.lender;
   if (input.reference !== undefined) data.reference = input.reference;
+  if (input.customerId !== undefined) {
+    data.customer = input.customerId
+      ? { connect: { id: input.customerId } }
+      : { disconnect: true };
+  }
   if (input.interestRate !== undefined) data.interestRate = new Prisma.Decimal(input.interestRate);
   if (input.interestMethod !== undefined) data.interestMethod = input.interestMethod;
   if (input.durationMonths !== undefined) data.durationMonths = input.durationMonths;

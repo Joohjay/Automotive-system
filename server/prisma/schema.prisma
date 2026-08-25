@@ -490,6 +490,7 @@ model Customer {
   creditAccount CreditAccount?
   sales         Sale[]
   returns       Return[]
+  loans         Loan[]
 
   @@index([name])
   @@index([phone])
@@ -724,6 +725,7 @@ model Loan {
   lender                String
   reference             String?
   branchId              String
+  customerId            String?
   principalAmount       Decimal            @db.Decimal(12, 2)
   interestRate          Decimal            @default(0) @db.Decimal(8, 2) // percentage
   interestMethod        LoanInterestMethod @default(FLAT)
@@ -739,6 +741,7 @@ model Loan {
   updatedAt             DateTime           @updatedAt
 
   branch        Branch          @relation(fields: [branchId], references: [id])
+  customer      Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   createdBy     User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
   schedules     LoanSchedule[]
   payments      LoanPayment[]
