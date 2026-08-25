@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { changePassword, forgotPassword, getCsrfToken, login, logout, me, resetPassword } from '../controllers/auth.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
+import mfaRouter from './mfa.js';
 
 const router = Router();
 
@@ -13,5 +14,6 @@ router.post('/logout', requireAuth(), logout);
 router.post('/change-password', requireAuth(), changePassword);
 router.post('/forgot-password', loginLimiter, forgotPassword);
 router.post('/reset-password', loginLimiter, resetPassword);
+router.use('/mfa', mfaRouter);
 
 export default router;

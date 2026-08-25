@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 
 import prisma from '../lib/prisma.js';
@@ -32,6 +33,9 @@ const BCRYPT_COST = 12;
 // bcrypt comparison, keeping response timing consistent for account enumeration.
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-equalizer-not-a-real-password', BCRYPT_COST);
 
+const MFA_COOKIE_NAME = 'autoparts_mfa';
+const MFA_COOKIE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+
 function clientIp(req: Request): string | undefined {
   return req.ip ?? req.headers['x-forwarded-for']?.toString();
 }
@@ -62,6 +66,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       lockedUntil: true,
       mustChangePassword: true,
       tokenVersion: true,
+      mfaEnabled: true,
       role: {
         select: { name: true, permissions: { select: { permission: { select: { code: true } } } } },
       },
@@ -141,6 +146,26 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.forbidden('This account branch is not active.');
   }
 
+  // MFA check: if MFA is enabled, issue a temporary MFA token instead of the full auth token
+  if (user.mfaEnabled) {
+    const mfaToken = jwt.sign(
+      { sub: user.id, purpose: 'mfa' },
+      config.jwt.secret,
+      { expiresIn: '5m' },
+    );
+
+    res.cookie(MFA_COOKIE_NAME, mfaToken, {
+      httpOnly: true,
+      secure: config.isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: MFA_COOKIE_MAX_AGE,
+    });
+
+    res.json({ mfaRequired: true });
+    return;
+  }
+
   const token = signAccessToken({
     id: user.id,
     email: user.email,
@@ -215,6 +240,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       status: true,
       lastLoginAt: true,
       mustChangePassword: true,
+      mfaEnabled: true,
       branchId: true,
       roleId: true,
       branch: { select: { name: true, code: true } },
@@ -237,6 +263,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       permissions,
     }),
     mustChangePassword: user.mustChangePassword,
+    mfaEnabled: user.mfaEnabled,
     permissions,
     lastLoginAt: user.lastLoginAt,
     branchName: user.branch.name,

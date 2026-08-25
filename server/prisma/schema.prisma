@@ -237,6 +237,8 @@ model User {
   lockedUntil          DateTime?
   mustChangePassword   Boolean    @default(false)
   tokenVersion         Int        @default(0)
+  mfaEnabled           Boolean    @default(false)
+  mfaSecret            String?
   branchId             String
   roleId               String
   createdAt            DateTime   @default(now())
