@@ -91,41 +91,33 @@ export const createReturn = asyncHandler(async (req: Request, res: Response) => 
   const priceById = new Map<string, Prisma.Decimal>();
   const soldQtyById = new Map<string, number>();
 
-  if (input.saleId) {
-    const sale = await prisma.sale.findFirst({
-      where: { id: input.saleId, branchId, status: 'COMPLETED' },
-      include: {
-        items: { select: { productId: true, quantity: true, unitPrice: true } },
-        returns: {
-          select: {
-            items: { select: { productId: true, quantity: true } },
-            status: true,
-          },
+  const sale = await prisma.sale.findFirst({
+    where: { id: input.saleId, branchId, status: 'COMPLETED' },
+    include: {
+      items: { select: { productId: true, quantity: true, unitPrice: true } },
+      returns: {
+        select: {
+          items: { select: { productId: true, quantity: true } },
+          status: true,
         },
       },
-    });
-    if (!sale) throw ApiError.notFound('Completed sale not found');
-    customerId = sale.customerId ?? input.customerId ?? null;
+    },
+  });
+  if (!sale) throw ApiError.notFound('Completed sale not found');
+  customerId = sale.customerId ?? input.customerId ?? null;
 
-    const returnedById = new Map<string, number>();
-    for (const r of sale.returns) {
-      if (r.status !== 'CANCELLED') {
-        for (const ri of r.items) {
-          returnedById.set(ri.productId, (returnedById.get(ri.productId) ?? 0) + ri.quantity);
-        }
+  const returnedById = new Map<string, number>();
+  for (const r of sale.returns) {
+    if (r.status !== 'CANCELLED') {
+      for (const ri of r.items) {
+        returnedById.set(ri.productId, (returnedById.get(ri.productId) ?? 0) + ri.quantity);
       }
     }
-    for (const it of sale.items) {
-      const remaining = it.quantity - (returnedById.get(it.productId) ?? 0);
-      priceById.set(it.productId, new Prisma.Decimal(it.unitPrice));
-      soldQtyById.set(it.productId, remaining);
-    }
-  } else {
-    const products = await prisma.product.findMany({
-      where: { id: { in: input.items.map((i) => i.productId) } },
-      select: { id: true, sellingPrice: true },
-    });
-    for (const p of products) priceById.set(p.id, new Prisma.Decimal(p.sellingPrice));
+  }
+  for (const it of sale.items) {
+    const remaining = it.quantity - (returnedById.get(it.productId) ?? 0);
+    priceById.set(it.productId, new Prisma.Decimal(it.unitPrice));
+    soldQtyById.set(it.productId, remaining);
   }
 
   if (input.customerId) customerId = input.customerId;

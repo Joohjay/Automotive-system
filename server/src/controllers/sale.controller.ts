@@ -120,7 +120,7 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
 
   const items = input.items.map((item) => {
     const product = byId.get(item.productId)!;
-    const unitPrice = new Prisma.Decimal(item.unitPrice ?? product.sellingPrice);
+    const unitPrice = new Prisma.Decimal(product.sellingPrice);
     const quantity = item.quantity;
     const lineDiscount = new Prisma.Decimal(item.discount ?? 0);
     const lineSubtotal = unitPrice.mul(quantity);
@@ -161,6 +161,10 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
   const changeDue = paidTotal.minus(total);
   if (changeDue.greaterThan(0) && nonCashPaid.greaterThan(total)) {
     throw ApiError.badRequest('Overpayment is only allowed with cash; reduce the amount paid');
+  }
+  // Cap cash overpayment: changeDue cannot exceed 20% of total
+  if (changeDue.greaterThan(total.mul(0.20))) {
+    throw ApiError.badRequest('Cash overpayment exceeds the allowed maximum (20% of total)');
   }
 
   const creditAmount = payments
@@ -295,6 +299,11 @@ export const voidSale = asyncHandler(async (req: Request, res: Response) => {
   const { start, end } = todayRange();
   if (sale.saleDate < start || sale.saleDate >= end) {
     throw ApiError.badRequest('Only sales from today can be voided');
+  }
+
+  // Only admins/managers can void sales created by other cashiers
+  if (sale.createdById !== req.user!.id && !['ADMIN', 'MANAGER'].includes(req.user!.roleName)) {
+    throw ApiError.forbidden('Only a manager or admin can void another user\'s sale');
   }
 
   const locationId = (await defaultLocationId(branchId)) ?? undefined;

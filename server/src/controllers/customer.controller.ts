@@ -144,6 +144,14 @@ export const updateCustomer = asyncHandler(async (req: Request, res: Response) =
   if (!existing) throw ApiError.notFound('Customer not found');
 
   const input = parseBody(updateCustomerSchema, req.body);
+
+  // Credit eligibility and limit changes require ADMIN role
+  if (input.creditEligible !== undefined || input.creditLimit !== undefined) {
+    if (req.user!.roleName !== 'ADMIN') {
+      throw ApiError.forbidden('Only administrators can modify credit eligibility or limits');
+    }
+  }
+
   const data: Prisma.CustomerUpdateInput = {};
   if (input.name !== undefined) data.name = input.name;
   if (input.phone !== undefined) data.phone = input.phone;

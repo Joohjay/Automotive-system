@@ -23,6 +23,21 @@ export async function isAdminRole(roleId: string): Promise<boolean> {
 }
 
 /**
+ * Prevents privilege escalation: only an OWNER may create, modify, reassign or
+ * reset the password of OWNER/ADMIN accounts (or grant someone an admin role).
+ * ADMIN users can still manage regular staff accounts.
+ */
+export function assertCanManageAdminAccount(
+  actorRoleName: string | undefined,
+  targetRoleName: string | null | undefined,
+): void {
+  if (!targetRoleName) return;
+  if (ADMIN_ROLE_NAMES.includes(targetRoleName) && actorRoleName !== 'OWNER') {
+    throw ApiError.forbidden('Only an OWNER can manage administrator accounts');
+  }
+}
+
+/**
  * Throws a 409 conflict when the operation would leave the system with zero
  * active OWNER/ADMIN users. Only relevant when the target is an active admin
  * who would stop being an active admin after the change.

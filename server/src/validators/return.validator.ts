@@ -12,7 +12,7 @@ export const returnItemSchema = z.object({
 });
 
 export const createReturnSchema = z.object({
-  saleId: id.nullable().optional(),
+  saleId: id, // required — standalone returns without proof of purchase are not allowed
   customerId: id.nullable().optional(),
   locationId: id.optional(),
   reason: z.string().max(2000).nullable().optional(),

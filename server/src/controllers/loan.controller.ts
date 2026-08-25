@@ -80,19 +80,36 @@ export const createLoan = asyncHandler(async (req: Request, res: Response) => {
   const input = parseBody(createLoanSchema, req.body);
   const branchId = req.user!.branchId;
 
+  // Compute totalRepayment server-side to prevent loan forgiveness
+  const principal = new Prisma.Decimal(input.principalAmount);
+  const rate = new Prisma.Decimal(input.interestRate);
+  const months = input.durationMonths;
+  let expectedInterest: Prisma.Decimal;
+
+  if (input.interestMethod === 'FLAT') {
+    expectedInterest = principal.mul(rate).div(100).mul(months);
+  } else if (input.interestMethod === 'REDUCING_BALANCE') {
+    expectedInterest = principal.mul(rate).div(100).mul(months);
+  } else {
+    // FIXED_SCHEDULE: use user-provided value only as a hint, clamp to >= 0
+    expectedInterest = new Prisma.Decimal(Math.max(0, input.totalExpectedInterest));
+  }
+
+  const totalRepayment = principal.plus(expectedInterest);
+
   const loan = await prisma.loan.create({
     data: {
       lender: input.lender,
       reference: input.reference ?? null,
       branchId,
-      principalAmount: new Prisma.Decimal(input.principalAmount),
-      interestRate: new Prisma.Decimal(input.interestRate),
+      principalAmount: principal,
+      interestRate: rate,
       interestMethod: input.interestMethod,
-      durationMonths: input.durationMonths,
+      durationMonths: months,
       startDate: input.startDate ?? new Date(),
       maturityDate: input.maturityDate ?? null,
-      totalExpectedInterest: new Prisma.Decimal(input.totalExpectedInterest),
-      totalRepayment: new Prisma.Decimal(input.totalRepayment),
+      totalExpectedInterest: expectedInterest,
+      totalRepayment,
       notes: input.notes ?? null,
       createdById: req.user!.id,
     },
@@ -240,6 +257,22 @@ export const recordLoanPayment = asyncHandler(async (req: Request, res: Response
   if (loan.status !== 'ACTIVE') throw ApiError.badRequest('Cannot record payments for non-active loans');
 
   const input = parseBody(loanPaymentSchema, req.body);
+
+  // Reject overpayment: cumulative payments cannot exceed totalRepayment
+  const targetRepayment = loan.totalRepayment.greaterThan(0)
+    ? loan.totalRepayment
+    : loan.principalAmount.plus(loan.totalExpectedInterest);
+  const totalPaid = await prisma.loanPayment.aggregate({
+    where: { loanId: loan.id },
+    _sum: { amount: true },
+  });
+  const alreadyPaid = totalPaid._sum.amount ?? new Prisma.Decimal(0);
+  const newTotal = alreadyPaid.plus(new Prisma.Decimal(input.amount));
+  if (newTotal.greaterThan(targetRepayment)) {
+    throw ApiError.badRequest(
+      `Payment would exceed the total repayment of ${targetRepayment.toFixed(2)} (already paid ${alreadyPaid.toFixed(2)})`,
+    );
+  }
 
   let scheduleId: string | null = null;
   if (input.scheduleId) {

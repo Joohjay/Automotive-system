@@ -17,6 +17,9 @@ function getTransporter(): nodemailer.Transporter {
     host: config.smtp.host,
     port: config.smtp.port,
     secure: config.smtp.port === 465,
+    connectionTimeout: 10_000,
+    greetingTimeout: 5_000,
+    socketTimeout: 15_000,
     auth: config.smtp.user
       ? { user: config.smtp.user, pass: config.smtp.pass }
       : undefined,

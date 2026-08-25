@@ -61,6 +61,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       failedLoginAttempts: true,
       lockedUntil: true,
       mustChangePassword: true,
+      tokenVersion: true,
       role: {
         select: { name: true, permissions: { select: { permission: { select: { code: true } } } } },
       },
@@ -145,6 +146,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     email: user.email,
     roleName: user.role.name,
     branchId: user.branchId,
+    tokenVersion: (user as { tokenVersion?: number }).tokenVersion ?? 0,
   });
 
   await prisma.user.update({
@@ -183,7 +185,6 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   }
 
   res.json({
-    token,
     mustChangePassword: user.mustChangePassword,
     user: toAuthUser({
       id: user.id,
@@ -249,6 +250,11 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
   if (req.user) {
+    // Invalidate all existing JWTs for this user
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { tokenVersion: { increment: 1 } },
+    });
     await recordAudit({
       userId: req.user.id,
       branchId: req.user.branchId,
@@ -260,7 +266,6 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     });
   }
   res.clearCookie(AUTH_COOKIE_NAME, { path: '/' });
-  // Stateless JWT: the client also discards its token.
   res.status(204).send();
 });
 
@@ -279,7 +284,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   const newHash = await bcrypt.hash(input.newPassword, BCRYPT_COST);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: newHash, mustChangePassword: false },
+    data: { passwordHash: newHash, mustChangePassword: false, tokenVersion: { increment: 1 } },
   });
 
   await recordAudit({
@@ -366,13 +371,13 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   });
 
   if (!resetToken) {
-    throw ApiError.badRequest('Invalid or expired reset token');
+    throw ApiError.badRequest('Invalid, expired, or already-used reset token');
   }
   if (resetToken.usedAt) {
-    throw ApiError.badRequest('This reset token has already been used');
+    throw ApiError.badRequest('Invalid, expired, or already-used reset token');
   }
   if (resetToken.expiresAt < new Date()) {
-    throw ApiError.badRequest('This reset token has expired');
+    throw ApiError.badRequest('Invalid, expired, or already-used reset token');
   }
 
   const newHash = await bcrypt.hash(input.newPassword, BCRYPT_COST);

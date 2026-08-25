@@ -60,8 +60,19 @@ export function requireAuth(): (
       if (!token) throw ApiError.unauthorized('Authentication required');
 
       const payload = verifyAccessToken(token);
+
+      // Fetch user + tokenVersion from DB to check revocation
       const user = await loadAuthUser(payload.sub);
       if (!user) throw ApiError.unauthorized('Account no longer exists');
+
+      // Check token version — incremented on logout/password change
+      const dbUser = await prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { tokenVersion: true },
+      });
+      if (!dbUser || dbUser.tokenVersion !== payload.tv) {
+        throw ApiError.unauthorized('Session has been invalidated. Please log in again.');
+      }
 
       if (user.userStatus !== 'ACTIVE') {
         throw ApiError.forbidden('Account is not active');
@@ -94,7 +105,7 @@ export function requirePermission(code: string) {
       return;
     }
     if (!user.permissions.includes(code)) {
-      next(ApiError.forbidden(`Permission required: ${code}`));
+      next(ApiError.forbidden('You do not have permission to perform this action'));
       return;
     }
     next();

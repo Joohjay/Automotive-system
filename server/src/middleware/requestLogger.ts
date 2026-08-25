@@ -16,6 +16,7 @@ export function requestContext(): (
   next: NextFunction,
 ) => void {
   return (req, res, next) => {
+    req.startTime = performance.now();
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     req.headers['x-request-id'] = id;
     res.setHeader('X-Request-Id', id);

@@ -7,7 +7,10 @@ import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { config } from '../config/env.js';
 import { ApiError } from '../middleware/error.js';
-import { assertKeepsActiveAdmin } from '../services/admin-guard.service.js';
+import {
+  assertCanManageAdminAccount,
+  assertKeepsActiveAdmin,
+} from '../services/admin-guard.service.js';
 import { recordAudit, scalarize } from '../services/audit.service.js';
 import { sendEmail } from '../services/email.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -23,6 +26,12 @@ const BCRYPT_COST = 12;
 
 function clientIp(req: Request): string | undefined {
   return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
+
+async function roleNameOf(roleId: string | undefined): Promise<string | null> {
+  if (!roleId) return null;
+  const role = await prisma.role.findUnique({ where: { id: roleId }, select: { name: true } });
+  return role?.name ?? null;
 }
 
 export const listUsers = asyncHandler(async (req: Request, res: Response) => {
@@ -107,6 +116,9 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   });
   if (existing) throw ApiError.conflict('A user with this email already exists');
 
+  const newRoleName = await roleNameOf(input.roleId);
+  assertCanManageAdminAccount(req.user!.roleName, newRoleName);
+
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_COST);
 
   const user = await prisma.user.create({
@@ -150,6 +162,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({
     where: { id: paramId(req, 'id') },
+    include: { role: { select: { name: true } } },
   });
   if (!existing) throw ApiError.notFound('User not found');
 
@@ -157,6 +170,9 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   if (existing.id === req.user!.id && input.status === 'INACTIVE') {
     throw ApiError.conflict('You cannot deactivate your own account');
   }
+  const prospectiveRoleName = await roleNameOf(input.roleId);
+  assertCanManageAdminAccount(req.user!.roleName, existing.role?.name);
+  assertCanManageAdminAccount(req.user!.roleName, prospectiveRoleName);
   await assertKeepsActiveAdmin({
     targetUserId: existing.id,
     becomesInactive: input.status === 'INACTIVE',
@@ -206,8 +222,10 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 export const activateUser = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({
     where: { id: paramId(req, 'id') },
+    include: { role: { select: { name: true } } },
   });
   if (!existing) throw ApiError.notFound('User not found');
+  assertCanManageAdminAccount(req.user!.roleName, existing.role?.name);
 
   const user = await prisma.user.update({
     where: { id: existing.id },
@@ -238,11 +256,13 @@ export const activateUser = asyncHandler(async (req: Request, res: Response) => 
 export const deactivateUser = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({
     where: { id: paramId(req, 'id') },
+    include: { role: { select: { name: true } } },
   });
   if (!existing) throw ApiError.notFound('User not found');
   if (existing.id === req.user!.id) {
     throw ApiError.conflict('You cannot deactivate your own account');
   }
+  assertCanManageAdminAccount(req.user!.roleName, existing.role?.name);
   await assertKeepsActiveAdmin({ targetUserId: existing.id, becomesInactive: true });
 
   const user = await prisma.user.update({
@@ -278,6 +298,7 @@ const assignRoleSchema = z.object({
 export const assignRole = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({
     where: { id: paramId(req, 'id') },
+    include: { role: { select: { name: true } } },
   });
   if (!existing) throw ApiError.notFound('User not found');
 
@@ -285,6 +306,8 @@ export const assignRole = asyncHandler(async (req: Request, res: Response) => {
 
   const role = await prisma.role.findUnique({ where: { id: roleId } });
   if (!role) throw ApiError.notFound('Role not found');
+  assertCanManageAdminAccount(req.user!.roleName, existing.role?.name);
+  assertCanManageAdminAccount(req.user!.roleName, role.name);
 
   await assertKeepsActiveAdmin({
     targetUserId: existing.id,
@@ -325,8 +348,10 @@ const assignBranchSchema = z.object({
 export const assignBranch = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({
     where: { id: paramId(req, 'id') },
+    include: { role: { select: { name: true } } },
   });
   if (!existing) throw ApiError.notFound('User not found');
+  assertCanManageAdminAccount(req.user!.roleName, existing.role?.name);
 
   const { branchId } = parseBody(assignBranchSchema, req.body);
 
@@ -363,8 +388,10 @@ export const assignBranch = asyncHandler(async (req: Request, res: Response) => 
 export const adminResetPassword = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({
     where: { id: paramId(req, 'id') },
+    include: { role: { select: { name: true } } },
   });
   if (!existing) throw ApiError.notFound('User not found');
+  assertCanManageAdminAccount(req.user!.roleName, existing.role?.name);
 
   const input = parseBody(adminResetPasswordSchema, req.body);
 

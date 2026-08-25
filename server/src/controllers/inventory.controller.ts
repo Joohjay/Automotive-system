@@ -196,6 +196,11 @@ export const createAdjustment = asyncHandler(async (req: Request, res: Response)
   const current = inventory?.quantityOnHand ?? 0;
   const delta = input.newQuantity - current;
 
+  // Cap adjustment magnitude: reject changes exceeding 500 units without admin approval
+  if (Math.abs(delta) > 500 && req.user!.roleName !== 'ADMIN') {
+    throw ApiError.badRequest('Adjustments exceeding 500 units require administrator approval');
+  }
+
   if (delta !== 0) {
     await prisma.$transaction(async (tx) => {
       await applyStockChange(tx, {

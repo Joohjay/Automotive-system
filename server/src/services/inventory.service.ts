@@ -40,17 +40,35 @@ export async function applyStockChange(
     locationId: input.locationId,
   };
 
-  let inventory = await tx.inventory.findUnique({
-    where: { branchId_productId_locationId: key },
-  });
+  // SELECT ... FOR UPDATE to prevent TOCTOU race conditions on concurrent stock changes.
+  const rows = await tx.$queryRaw<Array<{
+    id: string;
+    quantityOnHand: number;
+    avgCost: unknown;
+  }>>`
+    SELECT id, "quantityOnHand", "avgCost" FROM "Inventory"
+    WHERE "branchId" = ${key.branchId}
+      AND "productId" = ${key.productId}
+      AND "locationId" = ${key.locationId}
+    FOR UPDATE
+  `;
 
-  if (!inventory) {
+  let inventory: { id: string; quantityOnHand: number; avgCost: Prisma.Decimal };
+
+  if (rows.length === 0) {
     if (input.quantity < 0) {
       throw ApiError.badRequest('No stock on hand for this product/location');
     }
     inventory = await tx.inventory.create({
       data: { ...key, quantityOnHand: 0 },
     });
+  } else {
+    const row = rows[0]!;
+    inventory = {
+      id: row.id,
+      quantityOnHand: row.quantityOnHand,
+      avgCost: row.avgCost != null ? new Prisma.Decimal(String(row.avgCost)) : new Prisma.Decimal(0),
+    };
   }
 
   const quantityOnHand = inventory.quantityOnHand + input.quantity;

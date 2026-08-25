@@ -8,6 +8,7 @@ export interface TokenPayload {
   email: string;
   role: string;
   branchId: string;
+  tv: number; // tokenVersion for revocation
 }
 
 export function signAccessToken(user: {
@@ -15,12 +16,14 @@ export function signAccessToken(user: {
   email: string;
   roleName: string;
   branchId: string;
+  tokenVersion?: number;
 }): string {
   const payload: TokenPayload = {
     sub: user.id,
     email: user.email,
     role: user.roleName,
     branchId: user.branchId,
+    tv: user.tokenVersion ?? 0,
   };
 
   const options: SignOptions = {};

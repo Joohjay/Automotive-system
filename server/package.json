@@ -21,7 +21,9 @@
     "db:clean": "tsx scripts/dev-cleanup.ts",
     "db:cashier": "tsx scripts/dev-cashier.ts",
     "db:dev": "node scripts/dev-db.mjs up",
-    "db:dev:stop": "node scripts/dev-db.mjs down"
+    "db:dev:stop": "node scripts/dev-db.mjs down",
+    "test": "node --import tsx --test tests/unit/*.test.ts",
+    "test:security": "bash scripts/test-security.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

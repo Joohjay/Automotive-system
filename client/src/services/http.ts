@@ -9,7 +9,7 @@ const API_URL =
     ? rawApiUrl.replace(/\/+$/, '')
     : import.meta.env.PROD
       ? '/api'
-      : 'http://localhost:4000/api'
+      : 'http://localhost:4100/api'
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -47,11 +47,19 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
     if (csrf) headers.set('X-CSRF-Token', csrf)
   }
 
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30_000)
+
+  try {
+    return await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export async function apiRequest<T>(

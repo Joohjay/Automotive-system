@@ -14,7 +14,6 @@ export interface AppSettings {
 }
 
 export interface AuthResponse {
-  token: string
   mustChangePassword: boolean
   user: AuthUser
   permissions: string[]

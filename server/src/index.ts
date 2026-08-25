@@ -15,6 +15,10 @@ process.on('uncaughtException', (err) => {
 
 const server = createServer(app);
 
+// Prevent Slowloris: 30s request timeout, 31s headers timeout
+server.timeout = 30_000;
+server.headersTimeout = 31_000;
+
 server.listen(config.port, async () => {
   console.log(
     `[autoparts-api] listening on http://localhost:${config.port} (${config.env})`,

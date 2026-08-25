@@ -120,6 +120,15 @@ export const closeShift = asyncHandler(async (req: Request, res: Response) => {
   });
   const totalCashSales = Number(cashSales._sum.amount ?? 0);
   const expectedClosingCash = Number(shift.openingCash) + totalCashSales;
+  const difference = input.actualClosingCash - expectedClosingCash;
+
+  // Reconciliation guard: flag large discrepancies (more than 10% of expected or $50)
+  const tolerance = Math.max(expectedClosingCash * 0.10, 50);
+  if (Math.abs(difference) > tolerance) {
+    throw ApiError.badRequest(
+      `Cash discrepancy of ${difference.toFixed(2)} exceeds the tolerance of ${tolerance.toFixed(2)}. A manager must review.`,
+    );
+  }
 
   const updated = await prisma.shift.update({
     where: { id: shift.id },

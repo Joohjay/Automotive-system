@@ -31,9 +31,9 @@ if (!email) {
   process.exit(1);
 }
 
-if (password && (password === DEV_PASSWORD || password.length < 12)) {
+if (password && (password === DEV_PASSWORD || password.length < 8)) {
   console.error(
-    '[provision-admin] ERROR: ADMIN_PASSWORD must be at least 12 characters and must NOT be the development password.',
+    '[provision-admin] ERROR: ADMIN_PASSWORD must be at least 8 characters and must NOT be the development password.',
   );
   process.exit(1);
 }

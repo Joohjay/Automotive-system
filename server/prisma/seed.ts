@@ -134,7 +134,7 @@ async function main() {
 
   // --- Admin user (development only) ---
   const passwordHash = await bcrypt.hash(DEV_ADMIN_PASSWORD, 12);
-  const adminRoleId = roleMap.get('ADMIN') ?? roleMap.get('OWNER')!;
+  const adminRoleId = roleMap.get('OWNER') ?? roleMap.get('ADMIN')!;
   await prisma.user.upsert({
     where: { email: DEV_ADMIN_EMAIL },
     update: { branchId: branch.id, roleId: adminRoleId, status: 'ACTIVE', fullName: 'CEO' },

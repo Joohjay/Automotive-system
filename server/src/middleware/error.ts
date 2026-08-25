@@ -3,6 +3,17 @@ import { ZodError } from 'zod';
 import jwt from 'jsonwebtoken';
 import { Prisma } from '@prisma/client';
 
+import { config } from '../config/env.js';
+
+// Tracks request start time for response-time logging
+declare global {
+  namespace Express {
+    interface Request {
+      startTime?: number;
+    }
+  }
+}
+
 export class ApiError extends Error {
   readonly statusCode: number;
   readonly code: string;
@@ -89,7 +100,7 @@ function prismaErrorResponse(
 
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
@@ -107,7 +118,12 @@ export function errorHandler(
     statusCode = 400;
     code = 'INVALID_REQUEST';
     message = 'Invalid request data';
-    details = err.flatten();
+    // In production, don't leak internal field names and validation rules
+    if (config.isProduction) {
+      details = undefined;
+    } else {
+      details = err.flatten();
+    }
   } else if (err instanceof SyntaxError) {
     statusCode = 400;
     code = 'INVALID_JSON';
@@ -139,6 +155,7 @@ export function errorHandler(
 
   if (statusCode >= 500 && !isPrismaError(err)) {
     console.error('[error]', err);
+    details = undefined; // Never leak internal details in 5xx responses
   }
 
   const body: Record<string, unknown> = {
@@ -147,6 +164,22 @@ export function errorHandler(
 
   if (details !== undefined) {
     body.error = { ...(body.error as object), details };
+  }
+
+  // Attach request metadata for debugging
+  const requestId = req.headers['x-request-id'];
+  if (requestId) {
+    body.requestId = requestId;
+  }
+  if (req.startTime) {
+    body.durationMs = Math.round(performance.now() - req.startTime);
+  }
+
+  if (statusCode >= 500) {
+    console.error(`[error] ${req.method} ${req.originalUrl} → ${statusCode} ${code}: ${message}`, {
+      requestId,
+      userId: (req as { user?: { id?: string } }).user?.id,
+    });
   }
 
   res.status(statusCode).json(body);

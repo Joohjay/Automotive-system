@@ -6,8 +6,8 @@ const money = z.coerce.number().nonnegative('Must be zero or more');
 export const saleItemSchema = z.object({
   productId: id,
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1'),
-  unitPrice: money.optional(), // defaults to the current selling price
-  discount: money.optional().default(0), // line-level discount applied before sale discount
+  // unitPrice is always taken from the product catalog — no client override allowed
+  discount: money.optional().default(0),
 });
 
 export const salePaymentSchema = z.object({

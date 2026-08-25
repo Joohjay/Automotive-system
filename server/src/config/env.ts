@@ -6,8 +6,10 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
-  PORT: z.coerce.number().int().positive().default(4000),
-  CLIENT_ORIGIN: z.string().url().default('http://localhost:5173'),
+  PORT: z.coerce.number().int().positive().default(4100),
+  AUTH_LOGIN_LIMIT: z.coerce.number().int().positive().default(10),
+  AUTH_GLOBAL_LIMIT: z.coerce.number().int().positive().default(300),
+  CLIENT_ORIGIN: z.string().url().default('http://localhost:5174'),
   DATABASE_URL: z
     .string()
     .min(1, 'DATABASE_URL is required. See server/.env.example'),
@@ -68,6 +70,8 @@ if (parsed.data.NODE_ENV === 'production') {
 export const config = {
   env: parsed.data.NODE_ENV,
   port: parsed.data.PORT,
+  authLoginLimit: parsed.data.AUTH_LOGIN_LIMIT,
+  authGlobalLimit: parsed.data.AUTH_GLOBAL_LIMIT,
   clientOrigin: parsed.data.CLIENT_ORIGIN,
   isDevelopment: parsed.data.NODE_ENV === 'development',
   isProduction: parsed.data.NODE_ENV === 'production',
