@@ -27,6 +27,7 @@ import { UsersPage } from '@/pages/UsersPage'
 import { BranchesPage } from '@/pages/BranchesPage'
 import { AccountPage } from '@/pages/AccountPage'
 import { ForcePasswordChangePage } from '@/pages/ForcePasswordChangePage'
+import { MfaVerifyPage } from '@/pages/MfaVerifyPage'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Toaster position="top-right" richColors closeButton />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/mfa-verify" element={<MfaVerifyPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<ProtectedRoute />}>

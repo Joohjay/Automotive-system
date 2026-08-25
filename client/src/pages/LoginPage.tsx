@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth, MfaRequiredError } from '@/contexts/AuthContext'
 
 export function LoginPage() {
   const { login, settings } = useAuth()
@@ -32,6 +32,10 @@ export function LoginPage() {
       await login(email.trim(), password)
       navigate(from, { replace: true })
     } catch (err) {
+      if (err instanceof MfaRequiredError) {
+        navigate('/mfa-verify', { replace: true })
+        return
+      }
       setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.')
     } finally {
       setIsSubmitting(false)

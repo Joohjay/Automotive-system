@@ -13,6 +13,13 @@ import { UNAUTHORIZED_EVENT } from '@/services/http'
 import { ensureCsrfToken } from '@/lib/csrf'
 import type { AppSettings, AuthUser } from '@/types/auth'
 
+export class MfaRequiredError extends Error {
+  constructor() {
+    super('MFA_REQUIRED')
+    this.name = 'MfaRequiredError'
+  }
+}
+
 interface AuthContextValue {
   user: AuthUser | null
   permissions: string[]
@@ -73,6 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await loginRequest(email, password)
+    if (res.mfaRequired) {
+      // MFA is required — don't set session state, let caller redirect
+      throw new MfaRequiredError()
+    }
     setUser(res.user)
     setPermissions(res.permissions)
     setSettings(res.settings)
