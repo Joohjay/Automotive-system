@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -9,6 +12,9 @@ import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { requestContext, requestLogger } from './middleware/requestLogger.js';
 import { globalLimiter } from './middleware/rateLimit.js';
 import apiRouter from './routes/index.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = path.resolve(__dirname, '../../client/dist');
 
 const app = express();
 
@@ -34,6 +40,15 @@ app.use(csrfProtection);
 app.use('/api', globalLimiter);
 
 app.use('/api', apiRouter);
+
+// Serve built frontend
+app.use(express.static(clientDist));
+
+// SPA fallback — any non-API GET that wasn't a static file returns index.html
+app.get('/{*splat}', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
 
 app.use(notFoundHandler);
 app.use(errorHandler);

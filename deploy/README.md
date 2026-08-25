@@ -45,7 +45,7 @@ deploy/
 | Deploy config      | `deploy/apps/automotive.env`  | `deploy/apps/motorcycle.env`     |
 | Secrets            | `…/automotive/server/.env.production` | `…/motorcycle/server/.env.production` |
 | PM2 process        | `bennyblax-automotive-api`    | `bennyblax-motorcycle-api`       |
-| Internal API port  | 4000                          | 4001                             |
+| Internal API port  | 4100                          | 4101                             |
 | Database / user    | `bennyblax_automotive`        | `bennyblax_motorcycle`           |
 | Nginx vhost        | `automotive.conf`             | `motorcycle.conf`                |
 | Hostname           | `auto.bennyblax.co.tz`        | `moto.bennyblax.co.tz`           |

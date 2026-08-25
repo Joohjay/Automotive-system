@@ -76,10 +76,10 @@ Ensure a PostgreSQL database exists and matches `DATABASE_URL`, then:
 
 ```bash
 npm run prisma:generate   # generate the Prisma client
-npm run dev               # start the API on http://localhost:4000
+npm run dev               # start the API on http://localhost:4100
 ```
 
-Verify: `curl http://localhost:4000/api/health`
+Verify: `curl http://localhost:4100/api/health`
 
 ```json
 { "status": "ok", "service": "autoparts-api", "database": "up", ... }
@@ -92,7 +92,7 @@ cd client
 npm install
 
 cp .env.example .env      # VITE_API_URL points at the backend
-npm run dev               # start the dev server on http://localhost:5173
+npm run dev               # start the dev server on http://localhost:5174
 ```
 
 ## Local development database
@@ -119,7 +119,7 @@ Never commit `.env` files — they are ignored by Git.
 | Variable         | Location | Purpose                                        |
 | ---------------- | -------- | ---------------------------------------------- |
 | `DATABASE_URL`   | server   | PostgreSQL connection string                   |
-| `PORT`           | server   | API port (default 4000)                        |
+| `PORT`           | server   | API port (default 4100)                        |
 | `CLIENT_ORIGIN`  | server   | Allowed CORS origin for the frontend           |
 | `NODE_ENV`       | server   | development / test / production                |
 | `VITE_API_URL`   | client   | Base URL of the backend API                    |

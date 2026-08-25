@@ -40,7 +40,7 @@ for f in "$REPO_ROOT/deploy/apps/$APP_ID.env" "/opt/bennyblax/deploy/apps/$APP_I
   fi
 done
 
-API_URL="${2:-http://127.0.0.1:${API_PORT:-4000}/api/health}"
+API_URL="${2:-http://127.0.0.1:${API_PORT:-4100}/api/health}"
 APP_HOSTNAME="${APP_HOSTNAME:-auto.yourdomain.com}"
 PM2_NAME="${APP_NAME:-${APP_ID}-api}"
 CERT_PATH="${CERT_PATH:-/etc/letsencrypt/live/$APP_HOSTNAME/fullchain.pem}"

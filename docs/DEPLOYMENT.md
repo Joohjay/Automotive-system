@@ -50,7 +50,7 @@ pg_config --version  # PostgreSQL 14+
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NODE_ENV` | Yes | Set to `production` |
-| `PORT` | No | API port (default: 4000) |
+| `PORT` | No | API port (default: 4100) |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `JWT_SECRET` | Yes | Random secret, 32+ chars. Generate: `openssl rand -hex 64` |
 | `JWT_EXPIRES_IN` | No | Token lifetime (default: `8h`) |
@@ -369,7 +369,7 @@ curl -s https://auto.bennyblax.co.tz/api/health | jq
 A lightweight, application-aware health/resource monitor is included:
 
 ```bash
-# Monitor the Automotive app (defaults to its internal API on port 4000)
+# Monitor the Automotive app (defaults to its internal API on port 4100)
 ./scripts/monitor.sh automotive
 
 # Monitor any other app (future) — no rewrite needed
@@ -404,7 +404,7 @@ sudo ufw --force enable
 sudo ufw status
 ```
 
-Only ports 22, 80, 443 should be open. The API (port 4000) must NOT be exposed
+Only ports 22, 80, 443 should be open. The API (port 4100) must NOT be exposed
 publicly — Nginx proxies to it over localhost. If you need remote DB access,
 use an SSH tunnel instead of opening 5432.
 
@@ -480,7 +480,7 @@ HTTPS (Let's Encrypt / Certbot, hostname-based)
    ↓
 Nginx (reverse proxy — ONLY public entry point)
    ├── auto.bennyblax.co.tz → /opt/bennyblax/apps/automotive/client/dist (static SPA)
-   └── /api/                → proxy_pass http://127.0.0.1:4000
+   └── /api/                → proxy_pass http://127.0.0.1:4100
                                ↓
                          Node.js (PM2, bennyblax-automotive-api)
                          Express 5 + Prisma
@@ -502,7 +502,7 @@ pm2 save
 pm2 startup   # follow printed command
 
 # Check API health
-curl -s http://localhost:4000/api/health
+curl -s http://localhost:4100/api/health
 
 # View logs
 pm2 logs bennyblax-automotive-api

@@ -21,7 +21,7 @@
 #                      template; make NO changes to the system. Safe for
 #                      testing and CI.
 #   --hostname H       APP_HOSTNAME override
-#   --port P           API_PORT override (default 4000)
+#   --port P           API_PORT override (default 4100)
 #   --db-name D        DB_NAME override
 #   --db-user U        DB_USER override
 #   --app-name N       APP_NAME (PM2 process name) override
@@ -86,7 +86,7 @@ APP_ID=$APP_ID
 APP_NAME=${CLI_APP_NAME:-bennyblax-${APP_ID}-api}
 APP_HOSTNAME=${CLI_HOSTNAME:-${APP_ID}.yourdomain.com}
 APP_PATH=${CLI_APP_PATH:-/opt/bennyblax/apps/${APP_ID}}
-API_PORT=${CLI_PORT:-4000}
+API_PORT=${CLI_PORT:-4100}
 DB_NAME=${CLI_DB_NAME:-bennyblax_${APP_ID}}
 DB_USER=${CLI_DB_USER:-bennyblax_${APP_ID}}
 EOF
@@ -106,7 +106,7 @@ APP_NAME="${CLI_APP_NAME:-$APP_NAME}"
 APP_PATH="${CLI_APP_PATH:-$APP_PATH}"
 
 APP_HOSTNAME="${APP_HOSTNAME:-${APP_ID}.yourdomain.com}"
-API_PORT="${API_PORT:-4000}"
+API_PORT="${API_PORT:-4100}"
 DB_NAME="${DB_NAME:-bennyblax_${APP_ID}}"
 DB_USER="${DB_USER:-bennyblax_${APP_ID}}"
 APP_NAME="${APP_NAME:-bennyblax-${APP_ID}-api}"
