@@ -136,6 +136,17 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       ipAddress: clientIp(req),
       userAgent: req.headers['user-agent'],
     });
+
+    // Alert: send email when account gets locked (threshold reached)
+    if (lockUntil && config.emailProvider === 'smtp') {
+      void sendEmail({
+        to: user.email,
+        subject: 'Security Alert — Account Locked (BennyBlax)',
+        html: `<p>Your account has been temporarily locked due to ${attempts} failed login attempts.</p><p>The lock will expire in ${LOCKOUT_MINUTES} minutes.</p><p>If this was not you, contact your administrator immediately.</p>`,
+        text: `Your account has been temporarily locked due to ${attempts} failed login attempts. The lock will expire in ${LOCKOUT_MINUTES} minutes. If this was not you, contact your administrator immediately.`,
+      }).catch(() => {});
+    }
+
     throw genericDenial();
   }
 
@@ -292,7 +303,12 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
       userAgent: req.headers['user-agent'],
     });
   }
-  res.clearCookie(AUTH_COOKIE_NAME, { path: '/' });
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    path: '/',
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'lax',
+  });
   res.status(204).send();
 });
 

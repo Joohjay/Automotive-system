@@ -25,6 +25,10 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  MFA_ENCRYPTION_KEY: z
+    .string()
+    .length(64, 'MFA_ENCRYPTION_KEY must be a 64-char hex string (32 bytes). Generate with: openssl rand -hex 32')
+    .default('0000000000000000000000000000000000000000000000000000000000000000'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -92,4 +96,5 @@ export const config = {
     pass: parsed.data.SMTP_PASS,
     from: parsed.data.SMTP_FROM,
   },
+  mfaEncryptionKey: parsed.data.MFA_ENCRYPTION_KEY,
 } as const;

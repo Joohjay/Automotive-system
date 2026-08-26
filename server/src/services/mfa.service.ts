@@ -1,6 +1,7 @@
 import * as OTPAuth from 'otpauth';
 
 import { config } from '../config/env.js';
+import { encrypt, decrypt } from '../lib/crypto.js';
 
 const ISSUER = 'BennyBlax Automotive';
 
@@ -25,7 +26,18 @@ export function createMfaSecret(email: string): MfaSetupResult {
   };
 }
 
-export function verifyMfaToken(secret: string, token: string): boolean {
+/** Encrypt the TOTP secret before storing in the database. */
+export function encryptSecret(secret: string): string {
+  return encrypt(secret);
+}
+
+/** Decrypt the TOTP secret from the database for verification. */
+export function decryptSecret(encrypted: string): string {
+  return decrypt(encrypted);
+}
+
+export function verifyMfaToken(encryptedSecret: string, token: string): boolean {
+  const secret = decryptSecret(encryptedSecret);
   const totp = new OTPAuth.TOTP({
     issuer: ISSUER,
     algorithm: 'SHA1',

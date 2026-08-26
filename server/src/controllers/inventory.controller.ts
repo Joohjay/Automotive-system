@@ -10,6 +10,10 @@ import { notifyStockStatus } from '../services/notification.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { parseBody, parseQuery } from '../utils/validate.js';
 
+function clientIp(req: Request): string | undefined {
+  return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
+
 const adjustmentSchema = z.object({
   productId: z.string().min(1),
   locationId: z.string().min(1),
@@ -225,6 +229,8 @@ export const createAdjustment = asyncHandler(async (req: Request, res: Response)
     entityId: input.productId,
     previousValue: { quantityOnHand: current },
     newValue: { quantityOnHand: input.newQuantity, reason: input.reason },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   await notifyStockStatus(

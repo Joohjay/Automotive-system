@@ -9,6 +9,10 @@ import { applyStockChange } from '../services/inventory.service.js';
 import { notifyStockStatus } from '../services/notification.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { paramId, parseBody, parseQuery } from '../utils/validate.js';
+
+function clientIp(req: Request): string | undefined {
+  return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
 import {
   createSaleSchema,
   saleQuerySchema,
@@ -276,6 +280,8 @@ export const createSale = asyncHandler(async (req: Request, res: Response) => {
       paymentMethods: payments.map((p) => p.method),
       creditAmount: creditAmount.toFixed(2),
     },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: result.sale });
@@ -354,6 +360,8 @@ export const voidSale = asyncHandler(async (req: Request, res: Response) => {
     entityId: sale.id,
     previousValue: { status: 'COMPLETED' },
     newValue: { status: 'VOID', reason: input.reason },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.json({ data: result });

@@ -8,7 +8,7 @@ import { parseBody, paramId } from '../utils/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/error.js';
 import { recordAudit } from '../services/audit.service.js';
-import { createMfaSecret, verifyMfaToken } from '../services/mfa.service.js';
+import { createMfaSecret, encryptSecret, verifyMfaToken } from '../services/mfa.service.js';
 import { mfaVerifySchema, mfaSetupSchema } from '../validators/mfa.validator.js';
 import { signAccessToken } from '../lib/token.js';
 import { getSettings } from '../services/settings.service.js';
@@ -56,7 +56,7 @@ export const mfaSetup = asyncHandler(async (req: Request, res: Response) => {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { mfaSecret: secret },
+    data: { mfaSecret: encryptSecret(secret) },
   });
 
   await recordAudit({
@@ -202,7 +202,12 @@ export const mfaLogin = asyncHandler(async (req: Request, res: Response) => {
     data: { lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null },
   });
 
-  res.clearCookie('autoparts_mfa', { path: '/' });
+  res.clearCookie('autoparts_mfa', {
+    path: '/',
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'lax',
+  });
   res.cookie(AUTH_COOKIE_NAME, authToken, {
     httpOnly: true,
     secure: config.isProduction,

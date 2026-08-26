@@ -24,13 +24,17 @@ export const getHealth = asyncHandler(async (_req: Request, res: Response) => {
   }
 
   const statusCode = database === 'up' ? 200 : 503;
-  res.status(statusCode).json({
+  const body: Record<string, unknown> = {
     status: database === 'up' ? 'ok' : 'degraded',
     service: 'autoparts-api',
     database,
     dbLatencyMs,
     uptime: formatUptime(process.uptime()),
     timestamp: new Date().toISOString(),
-    nodeEnv: process.env.NODE_ENV ?? 'unknown',
-  });
+  };
+  // Only expose NODE_ENV in development to prevent information disclosure
+  if (process.env.NODE_ENV !== 'production') {
+    body.nodeEnv = process.env.NODE_ENV ?? 'unknown';
+  }
+  res.status(statusCode).json(body);
 });

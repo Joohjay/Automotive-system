@@ -6,6 +6,10 @@ import { ApiError } from '../middleware/error.js';
 import { recordAudit, scalarize } from '../services/audit.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { paramId, parseBody, parseQuery } from '../utils/validate.js';
+
+function clientIp(req: Request): string | undefined {
+  return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
 import {
   createLoanSchema,
   updateLoanSchema,
@@ -126,6 +130,8 @@ export const createLoan = asyncHandler(async (req: Request, res: Response) => {
     entityType: 'Loan',
     entityId: loan.id,
     newValue: scalarize(loan),
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: loan });
@@ -167,6 +173,8 @@ export const updateLoan = asyncHandler(async (req: Request, res: Response) => {
     entityId: loan.id,
     previousValue: scalarize(existing),
     newValue: scalarize(loan),
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.json({ data: loan });
@@ -208,6 +216,8 @@ export const closeLoan = asyncHandler(async (req: Request, res: Response) => {
     entityId: loan.id,
     previousValue: { status: existing.status },
     newValue: { status: 'CLOSED' },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.json({ data: loan });
@@ -251,6 +261,8 @@ export const generateSchedule = asyncHandler(async (req: Request, res: Response)
     entityType: 'Loan',
     entityId: loanId,
     newValue: { installments: input.installments.length },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: { count: schedules.count } });
@@ -335,6 +347,8 @@ export const recordLoanPayment = asyncHandler(async (req: Request, res: Response
       method: payment.method,
       scheduleId,
     },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: payment });

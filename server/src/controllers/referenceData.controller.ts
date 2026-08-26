@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import prisma from '../lib/prisma.js';
 import { ApiError } from '../middleware/error.js';
+import { recordAudit, scalarize } from '../services/audit.service.js';
 import { getSettings } from '../services/settings.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { paramId, parseBody } from '../utils/validate.js';
@@ -28,6 +29,10 @@ const locationSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+function clientIp(req: Request): string | undefined {
+  return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
+
 export const listCategories = asyncHandler(async (_req: Request, res: Response) => {
   const data = await prisma.category.findMany({
     orderBy: { name: 'asc' },
@@ -46,15 +51,42 @@ export const createCategory = asyncHandler(async (req: Request, res: Response) =
       isActive: input.isActive,
     },
   });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'CREATE',
+    entityType: 'Category',
+    entityId: data.id,
+    newValue: { name: data.name, description: data.description },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
   res.status(201).json({ data });
 });
 
 export const updateCategory = asyncHandler(async (req: Request, res: Response) => {
   const input = parseBody(categorySchema.partial(), req.body);
+  const existing = await prisma.category.findUnique({ where: { id: paramId(req, 'id') } });
+  if (!existing) throw ApiError.notFound('Category not found');
   const data = await prisma.category.update({
     where: { id: paramId(req, 'id') },
     data: { ...input, parentId: input.parentId === undefined ? undefined : input.parentId },
   });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'UPDATE',
+    entityType: 'Category',
+    entityId: data.id,
+    previousValue: scalarize(existing),
+    newValue: scalarize(data),
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
   res.json({ data });
 });
 
@@ -71,15 +103,42 @@ export const createBrand = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.brand.findUnique({ where: { name: input.name } });
   if (existing) throw ApiError.conflict('A brand with this name already exists');
   const data = await prisma.brand.create({ data: input });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'CREATE',
+    entityType: 'Brand',
+    entityId: data.id,
+    newValue: { name: data.name, description: data.description },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
   res.status(201).json({ data });
 });
 
 export const updateBrand = asyncHandler(async (req: Request, res: Response) => {
   const input = parseBody(brandSchema.partial(), req.body);
+  const existing = await prisma.brand.findUnique({ where: { id: paramId(req, 'id') } });
+  if (!existing) throw ApiError.notFound('Brand not found');
   const data = await prisma.brand.update({
     where: { id: paramId(req, 'id') },
     data: input,
   });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'UPDATE',
+    entityType: 'Brand',
+    entityId: data.id,
+    previousValue: scalarize(existing),
+    newValue: scalarize(data),
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
   res.json({ data });
 });
 
@@ -107,6 +166,18 @@ export const createLocation = asyncHandler(async (req: Request, res: Response) =
       isActive: input.isActive,
     },
   });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'CREATE',
+    entityType: 'StorageLocation',
+    entityId: data.id,
+    newValue: { code: data.code, name: data.name, type: data.type },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
   res.status(201).json({ data });
 });
 
@@ -120,6 +191,19 @@ export const updateLocation = asyncHandler(async (req: Request, res: Response) =
     where: { id: paramId(req, 'id') },
     data: input,
   });
+
+  await recordAudit({
+    userId: req.user!.id,
+    branchId: req.user!.branchId,
+    action: 'UPDATE',
+    entityType: 'StorageLocation',
+    entityId: data.id,
+    previousValue: scalarize(existing),
+    newValue: scalarize(data),
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+
   res.json({ data });
 });
 

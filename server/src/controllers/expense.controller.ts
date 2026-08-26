@@ -6,6 +6,10 @@ import { ApiError } from '../middleware/error.js';
 import { recordAudit } from '../services/audit.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { paramId, parseBody, parseQuery } from '../utils/validate.js';
+
+function clientIp(req: Request): string | undefined {
+  return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
 import {
   createExpenseSchema,
   createExpenseCategorySchema,
@@ -96,6 +100,8 @@ export const createExpense = asyncHandler(async (req: Request, res: Response) =>
       amount: expense.amount,
       paymentMethod: expense.paymentMethod,
     },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: expense });
@@ -135,6 +141,8 @@ export const createExpenseCategory = asyncHandler(async (req: Request, res: Resp
     entityType: 'ExpenseCategory',
     entityId: category.id,
     newValue: { name: category.name, description: category.description },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: category });
@@ -164,6 +172,8 @@ export const updateExpenseCategory = asyncHandler(async (req: Request, res: Resp
     entityId: category.id,
     previousValue: { name: existing.name, description: existing.description },
     newValue: { name: category.name, description: category.description },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.json({ data: category });

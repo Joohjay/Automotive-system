@@ -8,6 +8,10 @@ import { nextDocumentNumber } from '../services/document.service.js';
 import { applyStockChange } from '../services/inventory.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { paramId, parseBody, parseQuery } from '../utils/validate.js';
+
+function clientIp(req: Request): string | undefined {
+  return req.ip ?? req.headers['x-forwarded-for']?.toString();
+}
 import { createReturnSchema, returnQuerySchema } from '../validators/return.validator.js';
 
 async function defaultLocationId(branchId: string): Promise<string | null> {
@@ -229,6 +233,8 @@ export const createReturn = asyncHandler(async (req: Request, res: Response) => 
       refundMethod: input.refundMethod,
       stockTreatment: lines.map((l) => l.stockTreatment),
     },
+    ipAddress: clientIp(req),
+    userAgent: req.headers['user-agent'],
   });
 
   res.status(201).json({ data: result.ret });
