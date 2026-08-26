@@ -8,7 +8,9 @@ const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().int().positive().default(4100),
   AUTH_LOGIN_LIMIT: z.coerce.number().int().positive().default(10),
-  AUTH_GLOBAL_LIMIT: z.coerce.number().int().positive().default(300),
+  AUTH_GLOBAL_LIMIT: z.coerce.number().int().positive().default(500),
+  MFA_LIMIT: z.coerce.number().int().positive().default(5),
+  MAX_CONCURRENT_PER_IP: z.coerce.number().int().positive().default(50),
   CLIENT_ORIGIN: z.string().url().default('http://localhost:5174'),
   DATABASE_URL: z
     .string()
@@ -72,7 +74,10 @@ export const config = {
   port: parsed.data.PORT,
   authLoginLimit: parsed.data.AUTH_LOGIN_LIMIT,
   authGlobalLimit: parsed.data.AUTH_GLOBAL_LIMIT,
+  mfaLimit: parsed.data.MFA_LIMIT,
+  maxConcurrentPerIp: parsed.data.MAX_CONCURRENT_PER_IP,
   clientOrigin: parsed.data.CLIENT_ORIGIN,
+  dbUrl: parsed.data.DATABASE_URL,
   isDevelopment: parsed.data.NODE_ENV === 'development',
   isProduction: parsed.data.NODE_ENV === 'production',
   jwt: {
